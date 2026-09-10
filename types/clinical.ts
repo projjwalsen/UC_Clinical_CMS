@@ -5,6 +5,8 @@ export type ClinicalStatus =
 
 export interface Patient {
   id: string;
+  /** Unique research identifier linked to clinical dataset report rows */
+  ibdCode?: string;
   name: string;
   dateOfBirth: string;
   age: number;

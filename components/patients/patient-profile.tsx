@@ -79,6 +79,7 @@ import {
 } from "@/lib/relapse-utils";
 import { ipaaTotalStoolFrequency } from "@/lib/ipaa-utils";
 import { pouchoscopyScore } from "@/lib/pouchoscopy-utils";
+import { ClinicalDatasetPatientTab } from "@/components/reports/clinical-dataset-patient-tab";
 import {
   formatLabResult,
   labAbnormalFlag,
@@ -97,7 +98,8 @@ const tabsBeforeReproductive: [string, keyof ClinicalRecords | "overview"][] = [
   ["Imaging", "imaging"],
 ] as const;
 
-const tabsAfterReproductive: [string, keyof ClinicalRecords | "overview"][] = [
+const tabsAfterReproductive: [string, keyof ClinicalRecords | "overview" | "clinical-dataset"][] = [
+  ["Clinical dataset", "clinical-dataset"],
   ["Relapses", "relapses"],
   ["Surgery", "surgeries"],
   ["IPAA", "ipaa"],
@@ -109,15 +111,17 @@ const tabsAfterReproductive: [string, keyof ClinicalRecords | "overview"][] = [
 export function PatientProfile({
   patientId,
   onBack,
+  initialTab,
 }: {
   patientId: string;
   onBack: () => void;
+  initialTab?: "clinical-dataset";
 }) {
   const { patients, records, addRecord, addRecords } = useDemoStore();
   const patient = patients.find((p) => p.id === patientId);
-  const [tab, setTab] = useState<keyof ClinicalRecords | "overview">(
-    "overview",
-  );
+  const [tab, setTab] = useState<
+    keyof ClinicalRecords | "overview" | "clinical-dataset"
+  >(initialTab ?? "overview");
   const [drawer, setDrawer] = useState<keyof ClinicalRecords | null>(null);
   const [record, setRecord] = useState({
     date: "2026-09-07",
@@ -147,7 +151,7 @@ export function PatientProfile({
     );
   const isFemalePatient = patient.gender === "Female";
   const profileTabs = useMemo(
-    (): [string, keyof ClinicalRecords | "overview"][] => [
+    (): [string, keyof ClinicalRecords | "overview" | "clinical-dataset"][] => [
       ...tabsBeforeReproductive,
       isFemalePatient
         ? ["Pregnancy & offspring", "pregnancies"]
@@ -180,7 +184,7 @@ export function PatientProfile({
     ["Surgery status", related.surgeries.length ? "Surgical" : "Non-surgical"],
   ];
   const currentRows =
-    tab === "overview"
+    tab === "overview" || tab === "clinical-dataset"
       ? []
       : (related[tab] as unknown as Record<string, unknown>[]);
   const saveRecord = () => {
@@ -580,7 +584,9 @@ export function PatientProfile({
                     {profileTabs.find(([, key]) => key === tab)?.[0]}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    {tab === "pregnancies"
+                    {tab === "clinical-dataset"
+                      ? "Linked clinical dataset record used by the cohort report (demographics from this profile)."
+                      : tab === "pregnancies"
                       ? "Pregnancy and offspring summaries. Not linked to a visit."
                       : tab === "offspring"
                         ? "Offspring summary. Not linked to a visit."
@@ -607,14 +613,19 @@ export function PatientProfile({
                     <Plus className="size-4" />
                     Add record
                   </Button>
-                ) : (
-                  <Button size="sm" onClick={() => setDrawer(tab)}>
+                ) : tab === "clinical-dataset" ? null : (
+                  <Button
+                    size="sm"
+                    onClick={() => setDrawer(tab as keyof ClinicalRecords)}
+                  >
                     <Plus className="size-4" />
                     Add record
                   </Button>
                 )}
               </div>
-              {tab === "pregnancies" ? (
+              {tab === "clinical-dataset" ? (
+                <ClinicalDatasetPatientTab patient={patient} />
+              ) : tab === "pregnancies" ? (
                 <div className="space-y-8">
                   <section>
                     <div className="mb-3 flex items-center justify-between">

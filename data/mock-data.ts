@@ -113,7 +113,7 @@ const policeStations = [
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const monthsAgo = (n: number) => iso(new Date(2026, 8 - n, 6 + (n % 18)));
 
-export const seedPatients: Patient[] = Array.from({ length: 42 }, (_, i) => {
+export const seedPatients: Patient[] = Array.from({ length: 47 }, (_, i) => {
   const age = 18 + ((i * 7) % 55);
   const gender = i % 2 === 0 ? "Male" : "Female";
   const extent = extents[i % extents.length];
@@ -128,6 +128,7 @@ export const seedPatients: Patient[] = Array.from({ length: 42 }, (_, i) => {
   const kuppuswamy = calculateKuppuswamy(education, occupation, monthlyFamilyIncome);
   return {
     id: `UC-${String(1101 + i).padStart(4, "0")}`,
+    ibdCode: `IBD-${String(i + 1).padStart(4, "0")}`,
     name: `${firstNames[i % firstNames.length]} ${lastNames[(i * 3) % lastNames.length]}`,
     dateOfBirth: `${2026 - age}-${String((i % 12) + 1).padStart(2, "0")}-${String((i % 25) + 1).padStart(2, "0")}`,
     age,

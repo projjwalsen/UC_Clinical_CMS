@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Activity,
   BarChart3,
@@ -38,6 +40,7 @@ const nav = [
   ["clinical-records", "Clinical Records", Activity],
   ["reports", "Statistical Reports", BarChart3],
   ["advanced-reports", "Advanced Reports", FileBarChart],
+  ["clinical-dataset", "Clinical Dataset Report", FileBarChart],
   ["settings", "Settings", Settings],
 ] as const;
 const titles: Record<string, string> = {
@@ -49,18 +52,35 @@ const titles: Record<string, string> = {
   "advanced-reports": "Advanced Reports",
   settings: "Settings",
   profile: "Patient Profile",
+  "clinical-dataset": "Clinical Dataset Report",
 };
 
-export function AppShell() {
+export function AppShell({
+  initialPage,
+  initialPatientId,
+}: {
+  initialPage?: string;
+  initialPatientId?: string;
+} = {}) {
+  const router = useRouter();
   const { patients, logout } = useDemoStore();
-  const [page, setPage] = useState("dashboard");
-  const [patientId, setPatientId] = useState("");
+  const [page, setPage] = useState(initialPage ?? "dashboard");
+  const [patientId, setPatientId] = useState(initialPatientId ?? "");
   const [mobile, setMobile] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [search, setSearch] = useState("");
   const [profileMenu, setProfileMenu] = useState(false);
   const [notifications, setNotifications] = useState(false);
+  useEffect(() => {
+    if (initialPage) setPage(initialPage);
+    if (initialPatientId) setPatientId(initialPatientId);
+  }, [initialPage, initialPatientId]);
+
   const navigate = (next: string) => {
+    if (next === "clinical-dataset") {
+      router.push("/reports/clinical-dataset");
+      return;
+    }
     setPage(next);
     setMobile(false);
   };
@@ -308,6 +328,18 @@ export function AppShell() {
           )}
           {page === "reports" && <StatisticalReports />}
           {page === "advanced-reports" && <ReportBuilder />}
+          {page === "clinical-dataset" && (
+            <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
+              Open the full{" "}
+              <Link
+                href="/reports/clinical-dataset"
+                className="font-semibold text-teal-700 hover:underline"
+              >
+                Clinical Dataset Report
+              </Link>{" "}
+              workspace for filters, export, and print.
+            </div>
+          )}
           {page === "settings" && <SettingsPage />}
         </main>
       </div>
