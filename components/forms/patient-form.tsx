@@ -16,6 +16,11 @@ import {
 import type { Patient } from "@/types/clinical";
 import { calculateKuppuswamy } from "@/lib/kuppuswamy";
 import { KuppuswamySection } from "@/components/forms/kuppuswamy-section";
+import { OccupationSocioSection } from "@/components/forms/occupation-socio-section";
+import {
+  DEMO_COUNTRIES,
+  INDIAN_STATES_AND_UTS,
+} from "@/data/geo-lookups";
 
 const steps = [
   "Identification",
@@ -32,6 +37,7 @@ const initial = {
   address: "",
   city: "",
   state: "",
+  country: "India",
   pinCode: "",
   policeStation: "",
   phone: "",
@@ -52,6 +58,10 @@ const initial = {
   status: "Active disease",
   comorbidities: "",
   notes: "",
+  wageLossPerMonthRs: "",
+  daysAbsentFromWorkPerMonth: "",
+  treatmentCostPerMonthRs: "",
+  otherSocioEconomicInfo: "",
 };
 
 function nextUcId(existingIds: string[]) {
@@ -125,6 +135,8 @@ export function PatientForm({
     if (step === 1) {
       if (!form.address.trim()) next.address = "Address is required.";
       if (!form.city.trim()) next.city = "City is required.";
+      if (!form.state) next.state = "Select a state.";
+      if (!form.country) next.country = "Select a country.";
       if (!/^\d{10}$/.test(form.phone))
         next.phone = "Enter a valid 10-digit phone number.";
       if (form.pinCode && !/^\d{6}$/.test(form.pinCode))
@@ -162,10 +174,16 @@ export function PatientForm({
       address: form.address,
       city: form.city,
       state: form.state,
+      country: form.country,
       pinCode: form.pinCode,
       policeStation: form.policeStation || undefined,
       phone: form.phone,
-      alternatePhone: form.alternatePhone,
+      alternatePhone: form.alternatePhone || undefined,
+      defaultPhoneContact: "primary",
+      wageLossPerMonthRs: form.wageLossPerMonthRs || undefined,
+      daysAbsentFromWorkPerMonth: form.daysAbsentFromWorkPerMonth || undefined,
+      treatmentCostPerMonthRs: form.treatmentCostPerMonthRs || undefined,
+      otherSocioEconomicInfo: form.otherSocioEconomicInfo || undefined,
       email: form.email,
       religion: form.religion,
       maritalStatus: form.maritalStatus,
@@ -319,7 +337,33 @@ export function PatientForm({
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {input("address", "Present address", true)}
               {input("city", "City / village", true)}
-              {input("state", "State")}
+              <Field label="State" required error={errors.state}>
+                <Select
+                  className="w-full"
+                  value={form.state}
+                  onChange={(e) => set("state", e.target.value)}
+                >
+                  <option value="">Select state</option>
+                  {INDIAN_STATES_AND_UTS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Country" required error={errors.country}>
+                <Select
+                  className="w-full"
+                  value={form.country}
+                  onChange={(e) => set("country", e.target.value)}
+                >
+                  {DEMO_COUNTRIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
               {input("pinCode", "PIN code")}
               {input("policeStation", "Police station")}
               {input("phone", "Primary phone", true, "tel")}
@@ -397,6 +441,15 @@ export function PatientForm({
               ])}
               {input("comorbidities", "Relevant comorbidities")}
             </div>
+            <OccupationSocioSection
+              wageLossPerMonthRs={form.wageLossPerMonthRs}
+              daysAbsentFromWorkPerMonth={form.daysAbsentFromWorkPerMonth}
+              treatmentCostPerMonthRs={form.treatmentCostPerMonthRs}
+              otherSocioEconomicInfo={form.otherSocioEconomicInfo}
+              onChange={(key, value) =>
+                set(key as keyof typeof form, value)
+              }
+            />
             <div className="mt-5">
               <Field label="Clinical notes">
                 <Textarea
@@ -421,7 +474,8 @@ export function PatientForm({
                 ["Age / gender", `${age} / ${form.gender}`],
                 ["Phone", form.phone],
                 ["Police station", form.policeStation || "Not recorded"],
-                ["Location", `${form.city}, ${form.state}`],
+                ["Location", `${form.city}, ${form.state}, ${form.country}`],
+                ["Occupation (Kuppuswamy)", form.occupation || "—"],
                 ["Kuppuswamy score", String(kuppuswamy.totalScore || "—")],
                 [
                   "Socioeconomic class",

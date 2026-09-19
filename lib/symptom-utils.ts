@@ -55,7 +55,7 @@ export function buildSymptomFormState(
       };
     }
     return {
-      date: today,
+      date: lastAssessment[0].date,
       visitId: lastAssessment[0].visitId ?? defaultVisitId,
       ...getAssessmentMeta(lastAssessment),
       symptoms,
@@ -90,6 +90,7 @@ export function symptomFormToRecords(
   form: SymptomFormState,
   patientId: string,
   assessmentId: string,
+  existingIdsBySymptom?: Record<string, string>,
 ): SymptomRecord[] {
   const num = (value: string) => (value === "" ? undefined : Number(value));
   const weightLostKg = num(form.weightLostKg);
@@ -99,7 +100,7 @@ export function symptomFormToRecords(
   return SYMPTOMS.map((symptom, index) => {
     const row = form.symptoms[symptom];
     return {
-      id: `${assessmentId}-${index + 1}`,
+      id: existingIdsBySymptom?.[symptom] ?? `${assessmentId}-${index + 1}`,
       patientId,
       visitId: form.visitId || undefined,
       date: form.date,

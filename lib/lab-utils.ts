@@ -75,6 +75,34 @@ export function buildLabFormState(
   };
 }
 
+export function buildLabFormStateFromRecords(
+  records: LaboratoryResult[],
+  defaultVisitId = "",
+): LabFormState {
+  if (!records.length) return buildLabFormState(defaultVisitId);
+  return {
+    date: records[0].date,
+    visitId: records[0].visitId ?? defaultVisitId,
+    rows: records.map((record) => ({
+      id: record.id,
+      category: record.category,
+      testName: record.testName,
+      resultNumeric:
+        record.resultNumeric !== undefined
+          ? String(record.resultNumeric)
+          : record.value !== undefined
+            ? String(record.value)
+            : "",
+      resultText: record.resultText ?? "",
+      unit: record.unit ?? "",
+      referenceRange: record.referenceRange ?? "",
+      abnormalFlag: record.abnormalFlag ?? record.flag ?? "Normal",
+      cmvMethod: record.cmvMethod ?? "",
+      remarks: record.remarks ?? "",
+    })),
+  };
+}
+
 export function labFormToRecords(
   form: LabFormState,
   patientId: string,
@@ -82,7 +110,7 @@ export function labFormToRecords(
 ): LaboratoryResult[] {
   const num = (value: string) => (value === "" ? undefined : Number(value));
   return form.rows.map((row, index) => ({
-    id: `${batchId}-${index + 1}`,
+    id: row.id.startsWith("lab-row-") ? `${batchId}-${index + 1}` : row.id,
     patientId,
     visitId: form.visitId || undefined,
     date: form.date,

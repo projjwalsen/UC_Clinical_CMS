@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { VisitLinkedDataBanner } from "@/components/forms/visit-linked-data-banner";
+import { useSyncRecordsOnVisitContext } from "@/hooks/use-sync-records-on-visit-context";
 import { Check } from "lucide-react";
 import { SYMPTOMS, YES_NO } from "@/data/lookups";
 import {
@@ -15,25 +17,62 @@ import type { SymptomRecord, Visit } from "@/types/clinical";
 export function SymptomForm({
   patientId,
   visits,
+  patientRecords,
+  initialAssessment,
   lastAssessment,
   onCancel,
   onSave,
 }: {
   patientId: string;
   visits: Visit[];
+  patientRecords: SymptomRecord[];
+  initialAssessment?: SymptomRecord[] | null;
   lastAssessment?: SymptomRecord[] | null;
   onCancel: () => void;
   onSave: (records: SymptomRecord[]) => void;
 }) {
   const defaultVisitId = visits[0]?.id ?? "";
+  const seedAssessment = initialAssessment ?? lastAssessment ?? null;
   const [form, setForm] = useState<SymptomFormState>(() =>
-    buildSymptomFormState(lastAssessment ?? null, defaultVisitId),
+    buildSymptomFormState(seedAssessment, defaultVisitId),
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const assessmentId = useMemo(
-    () => `SYM-${patientId}-${Date.now()}`,
-    [patientId],
+  const [loadedExisting, setLoadedExisting] = useState(
+    () => !!initialAssessment?.length,
   );
+  const [existingIdsBySymptom, setExistingIdsBySymptom] = useState<
+    Record<string, string>
+  >(() =>
+    Object.fromEntries(
+      (initialAssessment ?? []).map((record) => [record.symptom, record.id]),
+    ),
+  );
+  const assessmentId = useMemo(
+    () =>
+      initialAssessment?.[0]?.id.split("-").slice(0, -1).join("-") ||
+      `SYM-${patientId}-${Date.now()}`,
+    [initialAssessment, patientId],
+  );
+
+  const onMatched = useCallback(
+    (records: SymptomRecord[]) => {
+      setForm(buildSymptomFormState(records, form.visitId));
+      setExistingIdsBySymptom(
+        Object.fromEntries(records.map((record) => [record.symptom, record.id])),
+      );
+      setLoadedExisting(true);
+    },
+    [form.visitId],
+  );
+
+  useSyncRecordsOnVisitContext({
+    visitId: form.visitId,
+    date: form.date,
+    visits,
+    pool: patientRecords,
+    enabled: !initialAssessment?.length,
+    onMatched,
+  });
 
   const updateRow = (
     symptom: string,
@@ -58,7 +97,14 @@ export function SymptomForm({
 
   const submit = () => {
     if (!validate()) return;
-    onSave(symptomFormToRecords(form, patientId, assessmentId));
+    onSave(
+      symptomFormToRecords(
+        form,
+        patientId,
+        assessmentId,
+        existingIdsBySymptom,
+      ),
+    );
   };
 
   const presentCount = SYMPTOMS.filter(
@@ -97,7 +143,10 @@ export function SymptomForm({
           </Field>
         </div>
 
-        {lastAssessment && (
+        {loadedExisting && (
+          <VisitLinkedDataBanner message="Existing symptom data for this visit date is loaded. Saving will update those entries." />
+        )}
+        {!loadedExisting && lastAssessment && (
           <p className="mb-4 rounded-lg bg-teal-50 px-4 py-3 text-xs text-teal-800">
             Symptom rows pre-filled from the last assessment. Weight and remarks
             apply to this visit as a whole.

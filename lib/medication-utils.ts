@@ -50,13 +50,36 @@ export function buildMedicationFormState(
   };
 }
 
+export function buildMedicationFormStateFromRecords(
+  records: MedicationRecord[],
+  defaultVisitId = "",
+  today = "2026-09-07",
+): MedicationFormState {
+  if (!records.length) return buildMedicationFormState(defaultVisitId, today);
+  return {
+    visitId: records[0].visitId ?? defaultVisitId,
+    rows: records.map((record) => ({
+      id: record.id,
+      drugName: record.drugName,
+      dose: record.dose ?? "",
+      route: record.route ?? "Oral",
+      startDate: record.startDate,
+      endDate: record.endDate ?? "",
+      status: record.status,
+      indication: record.indication ?? "",
+      adherenceNotes: record.adherenceNotes ?? "",
+      remarks: record.remarks ?? record.response ?? "",
+    })),
+  };
+}
+
 export function medicationFormToRecords(
   form: MedicationFormState,
   patientId: string,
   batchId: string,
 ): MedicationRecord[] {
   return form.rows.map((row, index) => ({
-    id: `${batchId}-${index + 1}`,
+    id: row.id.startsWith("med-row-") ? `${batchId}-${index + 1}` : row.id,
     patientId,
     visitId: form.visitId,
     drugName: row.drugName,

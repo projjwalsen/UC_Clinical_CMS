@@ -9,6 +9,7 @@ import type {
   ReportConfiguration,
 } from "@/types/clinical";
 import type { ClinicalDatasetRecord } from "@/types/clinical-report";
+import { recordMatchesVisitContext } from "@/lib/record-visit-matching";
 
 const KEYS = {
   patients: "uccms-demo-patients",
@@ -37,6 +38,16 @@ interface DemoStore {
   addRecords: (
     kind: keyof ClinicalRecords,
     records: ClinicalRecords[keyof ClinicalRecords][number][],
+  ) => void;
+  updateRecord: (
+    kind: keyof ClinicalRecords,
+    record: ClinicalRecords[keyof ClinicalRecords][number],
+  ) => void;
+  deleteRecord: (kind: keyof ClinicalRecords, recordId: string) => void;
+  deleteRecordsForVisitContext: (
+    kind: keyof ClinicalRecords,
+    patientId: string,
+    context: { date: string; visitId?: string },
   ) => void;
   saveReport: (report: ReportConfiguration) => void;
   updateClinicalDatasetRecord: (record: ClinicalDatasetRecord) => void;
@@ -75,6 +86,8 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             return {
               ...patient,
               ibdCode: patient.ibdCode ?? seed?.ibdCode,
+              country: patient.country ?? seed?.country ?? "India",
+              defaultPhoneContact: patient.defaultPhoneContact ?? "primary",
             };
           }),
         );
@@ -167,6 +180,38 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         setRecords((current) => ({
           ...current,
           [kind]: [...newRecords, ...current[kind]],
+        }));
+      },
+      updateRecord(kind, record) {
+        setRecords((current) => ({
+          ...current,
+          [kind]: current[kind].map((item) =>
+            item.id === record.id ? record : item,
+          ),
+        }));
+      },
+      deleteRecord(kind, recordId) {
+        setRecords((current) => ({
+          ...current,
+          [kind]: current[kind].filter((item) => item.id !== recordId),
+        }));
+      },
+      deleteRecordsForVisitContext(kind, patientId, context) {
+        setRecords((current) => ({
+          ...current,
+          [kind]: current[kind].filter((item) => {
+            const record = item as {
+              patientId: string;
+              date?: string;
+              visitId?: string;
+            };
+            if (record.patientId !== patientId) return true;
+            if (!record.date && !record.visitId) return true;
+            return !recordMatchesVisitContext(
+              { date: record.date ?? "", visitId: record.visitId },
+              context,
+            );
+          }),
         }));
       },
       saveReport(report) {

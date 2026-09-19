@@ -1,4 +1,8 @@
 import { VISIT_TYPE } from "@/data/lookups";
+import {
+  computeMayoScores,
+  parseMayoComponent,
+} from "@/lib/mayo-score";
 import type { Visit } from "@/types/clinical";
 
 export function calculateBmi(heightM: number, weightKg: number) {
@@ -17,6 +21,57 @@ export function suggestVisitType(visitCount: number) {
 export function getLastVisit(visits: Visit[]) {
   if (!visits.length) return null;
   return [...visits].sort((a, b) => b.date.localeCompare(a.date))[0];
+}
+
+export function visitToFormState(visit: Visit): VisitFormState {
+  return {
+    date: visit.date,
+    type: visit.type,
+    heightM: str(visit.heightM),
+    weightKg: str(visit.weightKg),
+    smokingStatus: visit.smokingStatus ?? "Never",
+    smokingYears: str(visit.smokingYears),
+    smokingType: visit.smokingType ?? "",
+    packYears: str(visit.packYears),
+    yearsSinceQuitting: str(visit.yearsSinceQuitting),
+    tobaccoChewingStatus: visit.tobaccoChewingStatus ?? "Never",
+    tobaccoIntakesPerDay: str(visit.tobaccoIntakesPerDay),
+    tobaccoYears: str(visit.tobaccoYears),
+    alcoholStatus: visit.alcoholStatus ?? "Never",
+    alcoholGPerDay: str(visit.alcoholGPerDay),
+    alcoholGPerWeek: str(visit.alcoholGPerWeek),
+    comorbidIllnesses: visit.comorbidIllnesses ?? "",
+    ocpUse: visit.ocpUse ?? "Never",
+    nsaidUse: visit.nsaidUse ?? "Never taken",
+    nsaidFrequency: visit.nsaidFrequency ?? "",
+    appendectomyHistory: visit.appendectomyHistory ?? "No",
+    ageAtAppendectomyYears: str(visit.ageAtAppendectomyYears),
+    onsetAppendectomyIntervalMonths: str(
+      visit.onsetAppendectomyIntervalMonths,
+    ),
+    otherRiskFactors: visit.otherRiskFactors ?? "",
+    generalSurvey: visit.generalSurvey ?? "",
+    anemia: visit.anemia ?? "",
+    oedema: visit.oedema ?? "",
+    jaundice: visit.jaundice ?? "",
+    peripheralLymphNodes: visit.peripheralLymphNodes ?? "",
+    skinRash: visit.skinRash ?? "",
+    otherPositiveFindings: visit.otherPositiveFindings ?? "",
+    abdominalExamination: visit.abdominalExamination ?? "",
+    otherSystemExamination: visit.otherSystemExamination ?? "",
+    mayoStoolFrequency: str(visit.mayoStoolFrequency),
+    mayoRectalBleeding: str(visit.mayoRectalBleeding),
+    mayoEndoscopicFindings: str(visit.mayoEndoscopicFindings),
+    mayoPhysicianGlobalAssessment: str(visit.mayoPhysicianGlobalAssessment),
+    clinicalState: visit.clinicalState ?? "Remission",
+    complication: visit.complication ?? "",
+    newEim: visit.newEim ?? "",
+    uceis: str(visit.uceis),
+    admission: visit.admission ?? "No",
+    specialComment: visit.specialComment ?? "",
+    montrealExtent: visit.montrealExtent ?? "E2",
+    montrealSeverity: visit.montrealSeverity ?? "S0",
+  };
 }
 
 const str = (value?: string | number) =>
@@ -55,13 +110,14 @@ export type VisitFormState = {
   otherPositiveFindings: string;
   abdominalExamination: string;
   otherSystemExamination: string;
-  partialMayoScore: string;
-  completeMayoScore: string;
+  mayoStoolFrequency: string;
+  mayoRectalBleeding: string;
+  mayoEndoscopicFindings: string;
+  mayoPhysicianGlobalAssessment: string;
   clinicalState: string;
   complication: string;
   newEim: string;
   uceis: string;
-  mayoEndoscopicScore: string;
   admission: string;
   specialComment: string;
   montrealExtent: string;
@@ -106,13 +162,14 @@ export function buildVisitFormState(
     otherPositiveFindings: "",
     abdominalExamination: "",
     otherSystemExamination: "",
-    partialMayoScore: "",
-    completeMayoScore: "",
+    mayoStoolFrequency: "",
+    mayoRectalBleeding: "",
+    mayoEndoscopicFindings: "",
+    mayoPhysicianGlobalAssessment: "",
     clinicalState: "Remission",
     complication: "",
     newEim: "",
     uceis: "",
-    mayoEndoscopicScore: "",
     admission: "No",
     specialComment: "",
     montrealExtent: "E2",
@@ -148,12 +205,25 @@ export function buildVisitFormState(
       lastVisit.onsetAppendectomyIntervalMonths,
     ),
     otherRiskFactors: lastVisit.otherRiskFactors ?? "",
-    partialMayoScore: str(lastVisit.partialMayoScore),
-    completeMayoScore: str(lastVisit.completeMayoScore),
+    mayoStoolFrequency: str(lastVisit.mayoStoolFrequency),
+    mayoRectalBleeding: str(lastVisit.mayoRectalBleeding),
+    mayoEndoscopicFindings: str(lastVisit.mayoEndoscopicFindings),
+    mayoPhysicianGlobalAssessment: str(
+      lastVisit.mayoPhysicianGlobalAssessment,
+    ),
     clinicalState: lastVisit.clinicalState ?? base.clinicalState,
     montrealExtent: lastVisit.montrealExtent ?? base.montrealExtent,
     montrealSeverity: lastVisit.montrealSeverity ?? base.montrealSeverity,
   };
+}
+
+export function mayoScoresFromVisitForm(form: VisitFormState) {
+  return computeMayoScores({
+    stoolFrequency: parseMayoComponent(form.mayoStoolFrequency),
+    rectalBleeding: parseMayoComponent(form.mayoRectalBleeding),
+    endoscopicFindings: parseMayoComponent(form.mayoEndoscopicFindings),
+    physicianGlobal: parseMayoComponent(form.mayoPhysicianGlobalAssessment),
+  });
 }
 
 export function visitFormToRecord(
@@ -164,6 +234,7 @@ export function visitFormToRecord(
   const num = (value: string) => (value === "" ? undefined : Number(value));
   const heightM = Number(form.heightM);
   const weightKg = Number(form.weightKg);
+  const mayo = mayoScoresFromVisitForm(form);
   return {
     id: visitId,
     patientId,
@@ -200,13 +271,17 @@ export function visitFormToRecord(
     otherPositiveFindings: form.otherPositiveFindings || undefined,
     abdominalExamination: form.abdominalExamination || undefined,
     otherSystemExamination: form.otherSystemExamination || undefined,
-    partialMayoScore: num(form.partialMayoScore),
-    completeMayoScore: num(form.completeMayoScore),
+    mayoStoolFrequency: num(form.mayoStoolFrequency),
+    mayoRectalBleeding: num(form.mayoRectalBleeding),
+    mayoEndoscopicFindings: num(form.mayoEndoscopicFindings),
+    mayoPhysicianGlobalAssessment: num(form.mayoPhysicianGlobalAssessment),
+    partialMayoScore: mayo.partialMayoScore,
+    completeMayoScore: mayo.completeMayoScore,
     clinicalState: form.clinicalState,
     complication: form.complication || undefined,
     newEim: form.newEim || undefined,
     uceis: num(form.uceis),
-    mayoEndoscopicScore: num(form.mayoEndoscopicScore),
+    mayoEndoscopicScore: mayo.mayoEndoscopicScore,
     admission: form.admission,
     specialComment: form.specialComment || undefined,
     montrealExtent: form.montrealExtent,

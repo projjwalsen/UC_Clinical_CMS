@@ -15,10 +15,17 @@ export interface Patient {
   address: string;
   city: string;
   state: string;
+  country?: string;
   pinCode: string;
   policeStation?: string;
   phone: string;
   alternatePhone?: string;
+  /** Which number is the default contact for lists and reports */
+  defaultPhoneContact?: "primary" | "alternate";
+  wageLossPerMonthRs?: string;
+  daysAbsentFromWorkPerMonth?: string;
+  treatmentCostPerMonthRs?: string;
+  otherSocioEconomicInfo?: string;
   email?: string;
   religion: string;
   maritalStatus: string;
@@ -80,6 +87,10 @@ export interface Visit {
   otherPositiveFindings?: string;
   abdominalExamination?: string;
   otherSystemExamination?: string;
+  mayoStoolFrequency?: number;
+  mayoRectalBleeding?: number;
+  mayoEndoscopicFindings?: number;
+  mayoPhysicianGlobalAssessment?: number;
   partialMayoScore?: number;
   completeMayoScore?: number;
   clinicalState?: string;
@@ -158,6 +169,9 @@ export interface EndoscopyRecord {
   findings?: string;
   baronScore?: number;
   mayoEndoscopicScore?: number;
+  uceisVascularPattern?: number;
+  uceisBleeding?: number;
+  uceisErosionsUlcers?: number;
   uceis?: number;
   diseaseExtent?: string;
   remarks?: string;
@@ -173,6 +187,11 @@ export interface HistopathologyRecord {
   parameter: string;
   present?: string;
   scoreGrade?: string;
+  robartsChronicInflammatoryInfiltrate?: number;
+  robartsNeutrophilsLaminaPropria?: number;
+  robartsNeutrophilsEpithelium?: number;
+  robartsErosionUlceration?: number;
+  robartsErosionUlcerationCode?: string;
   histopathologyScore?: number;
   remarks?: string;
   /** @deprecated use present string */
@@ -294,7 +313,8 @@ export interface IPAARecord {
 export interface PouchoscopyRecord {
   id: string;
   patientId: string;
-  visitId: string;
+  visitId?: string;
+  serialNumber?: number;
   date: string;
   cuffFindings?: string;
   bodyFinding?: string;
@@ -308,6 +328,9 @@ export interface PouchoscopyRecord {
   scoreValue?: number;
   inference?: string;
   remarks?: string;
+  /** Histology report / image marked as attached (demo) */
+  histologyAttachmentChecked?: boolean;
+  histologyAttachmentFileName?: string;
   /** @deprecated use scoreValue */
   score?: number;
 }

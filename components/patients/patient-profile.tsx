@@ -39,8 +39,16 @@ import type {
   IPAARecord,
   PouchoscopyRecord,
   SymptomRecord,
+  SurgeryRecord,
   Visit,
 } from "@/types/clinical";
+import { SectionDataChecklist } from "@/components/patients/section-data-checklist";
+import { RecordRowActions } from "@/components/patients/record-row-actions";
+import { buildPatientSectionStatus } from "@/lib/patient-section-status";
+import {
+  assessmentGroupKey,
+  resolveVisitContext,
+} from "@/lib/record-visit-matching";
 import { VisitForm } from "@/components/forms/visit-form";
 import { SymptomForm } from "@/components/forms/symptom-form";
 import { EimForm } from "@/components/forms/eim-form";
@@ -59,6 +67,7 @@ import { formatPresent, getLastSymptomAssessment } from "@/lib/symptom-utils";
 import { formatEimPresent, getLastEimAssessment } from "@/lib/eim-utils";
 import {
   endoscopyMayoScore,
+  endoscopyUceisScore,
   getLastEndoscopy,
 } from "@/lib/endoscopy-utils";
 import {
@@ -78,8 +87,11 @@ import {
   relapseOutcomeLabel,
 } from "@/lib/relapse-utils";
 import { ipaaTotalStoolFrequency } from "@/lib/ipaa-utils";
-import { pouchoscopyScore } from "@/lib/pouchoscopy-utils";
+import { nextPouchoscopySerialNumber } from "@/lib/pouchoscopy-utils";
 import { ClinicalDatasetPatientTab } from "@/components/reports/clinical-dataset-patient-tab";
+import { PatientPhoneDefaultEditor } from "@/components/patients/patient-phone-default";
+import { PatientEditForm } from "@/components/forms/patient-edit-form";
+import { getPatientDisplayPhone } from "@/lib/patient-contact";
 import {
   formatLabResult,
   labAbnormalFlag,
@@ -93,19 +105,34 @@ const tabsBeforeReproductive: [string, keyof ClinicalRecords | "overview"][] = [
   ["Extra-intestinal manifestations", "eims"],
   ["Laboratory results", "labs"],
   ["Medications", "medications"],
-  ["Endoscopy", "endoscopies"],
+  ["Colonoscopy and endoscopic", "endoscopies"],
   ["Histopathology", "histopathology"],
   ["Imaging", "imaging"],
 ] as const;
+
+type DrawerPrefill = {
+  visit?: Visit;
+  symptomRecords?: SymptomRecord[];
+  eimRecords?: EIMRecord[];
+  labRecords?: LaboratoryResult[];
+  endoscopy?: EndoscopyRecord;
+  histopathology?: HistopathologyRecord[];
+  imaging?: ImagingRecord;
+  medicationRecords?: MedicationRecord[];
+  relapse?: RelapseRecord;
+  ipaa?: IPAARecord;
+  pouchoscopy?: PouchoscopyRecord;
+  offspring?: OffspringRecord;
+  pregnancyRecords?: PregnancyRecord[];
+  surgery?: SurgeryRecord;
+};
 
 const tabsAfterReproductive: [string, keyof ClinicalRecords | "overview" | "clinical-dataset"][] = [
   ["Clinical dataset", "clinical-dataset"],
   ["Relapses", "relapses"],
   ["Surgery", "surgeries"],
   ["IPAA", "ipaa"],
-  ["Pouchoscopy", "pouchoscopies"],
-  ["Outcomes", "outcomes"],
-  ["Documents", "overview"],
+  ["Histology pouchoscopy", "pouchoscopies"],
 ];
 
 export function PatientProfile({
@@ -117,12 +144,36 @@ export function PatientProfile({
   onBack: () => void;
   initialTab?: "clinical-dataset";
 }) {
-  const { patients, records, addRecord, addRecords } = useDemoStore();
+  const {
+    patients,
+    records,
+    clinicalDatasetRecords,
+    addRecord,
+    addRecords,
+    updateRecord,
+    deleteRecord,
+    deleteRecordsForVisitContext,
+    updatePatient,
+  } = useDemoStore();
   const patient = patients.find((p) => p.id === patientId);
   const [tab, setTab] = useState<
     keyof ClinicalRecords | "overview" | "clinical-dataset"
   >(initialTab ?? "overview");
   const [drawer, setDrawer] = useState<keyof ClinicalRecords | null>(null);
+  const [drawerPrefill, setDrawerPrefill] = useState<DrawerPrefill | null>(
+    null,
+  );
+
+  const closeDrawer = () => {
+    setDrawer(null);
+    setDrawerPrefill(null);
+  };
+
+  const openAddDrawer = (kind: keyof ClinicalRecords) => {
+    setDrawerPrefill(null);
+    setDrawer(kind);
+  };
+  const [editPersonalOpen, setEditPersonalOpen] = useState(false);
   const [record, setRecord] = useState({
     date: "2026-09-07",
     type: "Follow-up",
@@ -142,6 +193,30 @@ export function PatientProfile({
       ) as unknown as ClinicalRecords,
     [records, patientId],
   );
+  const histologyPouchoscopyRows = useMemo(
+    () =>
+      [...(related.pouchoscopies as PouchoscopyRecord[])].sort(
+        (a, b) =>
+          (a.serialNumber ?? 0) - (b.serialNumber ?? 0) ||
+          a.date.localeCompare(b.date),
+      ),
+    [related.pouchoscopies],
+  );
+  const nextPouchoscopySl = useMemo(
+    () => nextPouchoscopySerialNumber(records.pouchoscopies, patientId),
+    [records.pouchoscopies, patientId],
+  );
+  const sectionStatusItems = useMemo(
+    () =>
+      patient
+        ? buildPatientSectionStatus(
+            patient,
+            related,
+            clinicalDatasetRecords,
+          )
+        : [],
+    [patient, related, clinicalDatasetRecords],
+  );
   if (!patient)
     return (
       <EmptyState
@@ -149,6 +224,7 @@ export function PatientProfile({
         description="This local demonstration record may have been reset."
       />
     );
+
   const isFemalePatient = patient.gender === "Female";
   const profileTabs = useMemo(
     (): [string, keyof ClinicalRecords | "overview" | "clinical-dataset"][] => [
@@ -227,52 +303,82 @@ export function PatientProfile({
                     value: record.value,
                   };
     addRecord(drawer, { ...base, ...extras } as never);
-    setDrawer(null);
+    closeDrawer();
     toast.success("Clinical record added to local demo data");
   };
+
+  const upsertVisitContextBatch = <T extends { date: string; visitId?: string }>(
+    kind: keyof ClinicalRecords,
+    batch: T[],
+  ) => {
+    if (!batch.length) return;
+    const ctx = resolveVisitContext(
+      related.visits as Visit[],
+      batch[0].visitId ?? "",
+      batch[0].date,
+    );
+    deleteRecordsForVisitContext(kind, patientId, ctx);
+    addRecords(kind, batch as never);
+  };
+
   const saveVisit = (visit: Visit) => {
-    addRecord("visits", visit);
-    setDrawer(null);
-    toast.success("Visit added to local demo data");
+    const exists = records.visits.some((v) => v.id === visit.id);
+    if (exists) updateRecord("visits", visit);
+    else addRecord("visits", visit);
+    closeDrawer();
+    toast.success(exists ? "Visit updated" : "Visit added");
   };
   const saveSymptoms = (symptomRecords: SymptomRecord[]) => {
-    addRecords("symptoms", symptomRecords);
-    setDrawer(null);
+    upsertVisitContextBatch("symptoms", symptomRecords);
+    closeDrawer();
     toast.success("Symptom assessment saved");
   };
   const saveEims = (eimRecords: EIMRecord[]) => {
-    addRecords("eims", eimRecords);
-    setDrawer(null);
+    upsertVisitContextBatch("eims", eimRecords);
+    closeDrawer();
     toast.success("EIM assessment saved");
   };
   const saveLabs = (labRecords: LaboratoryResult[]) => {
-    addRecords("labs", labRecords);
-    setDrawer(null);
+    upsertVisitContextBatch("labs", labRecords);
+    closeDrawer();
     toast.success("Lab results saved");
   };
   const saveEndoscopy = (endoscopyRecord: EndoscopyRecord) => {
-    addRecord("endoscopies", endoscopyRecord);
-    setDrawer(null);
-    toast.success("Endoscopy record saved");
+    const exists = records.endoscopies.some((r) => r.id === endoscopyRecord.id);
+    if (exists) updateRecord("endoscopies", endoscopyRecord);
+    else addRecord("endoscopies", endoscopyRecord);
+    closeDrawer();
+    toast.success(exists ? "Colonoscopy updated" : "Colonoscopy record saved");
   };
-  const saveHistopathology = (records: HistopathologyRecord[]) => {
-    addRecords("histopathology", records);
-    setDrawer(null);
+  const saveHistopathology = (histopathologyRecords: HistopathologyRecord[]) => {
+    upsertVisitContextBatch("histopathology", histopathologyRecords);
+    closeDrawer();
     toast.success("Histopathology records saved");
   };
   const saveImaging = (imagingRecord: ImagingRecord) => {
-    addRecord("imaging", imagingRecord);
-    setDrawer(null);
-    toast.success("Imaging record saved");
+    const exists = records.imaging.some((r) => r.id === imagingRecord.id);
+    if (exists) updateRecord("imaging", imagingRecord);
+    else addRecord("imaging", imagingRecord);
+    closeDrawer();
+    toast.success(exists ? "Imaging updated" : "Imaging record saved");
   };
   const saveMedications = (medicationRecords: MedicationRecord[]) => {
+    if (!medicationRecords.length) return;
+    const visitId = medicationRecords[0].visitId;
+    related.medications
+      .filter((m) => m.patientId === patientId && m.visitId === visitId)
+      .forEach((m) => deleteRecord("medications", m.id));
     addRecords("medications", medicationRecords);
-    setDrawer(null);
+    closeDrawer();
     toast.success("Medication records saved");
   };
   const savePregnancy = (pregnancyRecords: PregnancyRecord[]) => {
-    addRecords("pregnancies", pregnancyRecords);
-    setDrawer(null);
+    pregnancyRecords.forEach((record) => {
+      const exists = records.pregnancies.some((r) => r.id === record.id);
+      if (exists) updateRecord("pregnancies", record);
+      else addRecord("pregnancies", record);
+    });
+    closeDrawer();
     toast.success(
       pregnancyRecords.length === 1
         ? "Pregnancy record saved"
@@ -280,25 +386,69 @@ export function PatientProfile({
     );
   };
   const saveOffspring = (offspringRecord: OffspringRecord) => {
-    addRecord("offspring", offspringRecord);
-    setDrawer(null);
-    toast.success("Offspring record saved");
+    const exists = records.offspring.some((r) => r.id === offspringRecord.id);
+    if (exists) updateRecord("offspring", offspringRecord);
+    else addRecord("offspring", offspringRecord);
+    closeDrawer();
+    toast.success(exists ? "Offspring updated" : "Offspring record saved");
   };
   const saveRelapse = (relapseRecord: RelapseRecord) => {
-    addRecord("relapses", relapseRecord);
-    setDrawer(null);
-    toast.success("Relapse record saved");
+    const exists = records.relapses.some((r) => r.id === relapseRecord.id);
+    if (exists) updateRecord("relapses", relapseRecord);
+    else addRecord("relapses", relapseRecord);
+    closeDrawer();
+    toast.success(exists ? "Relapse updated" : "Relapse record saved");
   };
   const saveIpaa = (ipaaRecord: IPAARecord) => {
-    addRecord("ipaa", ipaaRecord);
-    setDrawer(null);
-    toast.success("IPAA follow-up saved");
+    const exists = records.ipaa.some((r) => r.id === ipaaRecord.id);
+    if (exists) updateRecord("ipaa", ipaaRecord);
+    else addRecord("ipaa", ipaaRecord);
+    closeDrawer();
+    toast.success(exists ? "IPAA updated" : "IPAA follow-up saved");
   };
   const savePouchoscopy = (pouchoscopyRecord: PouchoscopyRecord) => {
-    addRecord("pouchoscopies", pouchoscopyRecord);
-    setDrawer(null);
-    toast.success("Pouchoscopy record saved");
+    const exists = records.pouchoscopies.some(
+      (r) => r.id === pouchoscopyRecord.id,
+    );
+    if (exists) updateRecord("pouchoscopies", pouchoscopyRecord);
+    else addRecord("pouchoscopies", pouchoscopyRecord);
+    closeDrawer();
+    toast.success(
+      exists ? "Histology pouchoscopy updated" : "Pouchoscopy record saved",
+    );
   };
+
+  const handleDeleteRecord = (
+    kind: keyof ClinicalRecords,
+    recordId: string,
+  ) => {
+    deleteRecord(kind, recordId);
+    toast.success("Entry deleted");
+  };
+
+  const openEditVisit = (visit: Visit) => {
+    setDrawerPrefill({ visit });
+    setDrawer("visits");
+  };
+
+  const openEditSymptoms = (row: SymptomRecord) => {
+    const group = (related.symptoms as SymptomRecord[]).filter(
+      (r) => assessmentGroupKey(r) === assessmentGroupKey(row),
+    );
+    setDrawerPrefill({ symptomRecords: group });
+    setDrawer("symptoms");
+  };
+
+  const openEditEndoscopy = (row: EndoscopyRecord) => {
+    setDrawerPrefill({ endoscopy: row });
+    setDrawer("endoscopies");
+  };
+
+  const actionsHeader = (
+    <th className="px-4 py-3 text-right text-[11px] uppercase text-slate-500">
+      Actions
+    </th>
+  );
   const lastVisit = useMemo(
     () => getLastVisit(related.visits as Visit[]),
     [related.visits],
@@ -355,12 +505,15 @@ export function PatientProfile({
     ["Status", "status"],
     ["Remarks", "remarksDisplay"],
   ];
-  const endoscopyColumns: [string, keyof EndoscopyRecord | "mayoScore"][] = [
+  const endoscopyColumns: [
+    string,
+    keyof EndoscopyRecord | "mayoScore" | "uceisScore",
+  ][] = [
     ["Date", "date"],
     ["Visit", "visitId"],
     ["Baron", "baronScore"],
     ["Mayo", "mayoScore"],
-    ["UCEIS", "uceis"],
+    ["UCEIS", "uceisScore"],
     ["Extent", "diseaseExtent"],
     ["Findings", "findings"],
   ];
@@ -431,15 +584,12 @@ export function PatientProfile({
   ];
   const pouchoscopyColumns: [
     string,
-    keyof PouchoscopyRecord | "scoreDisplay",
+    keyof PouchoscopyRecord | "serialDisplay",
   ][] = [
-    ["Date", "date"],
-    ["Visit", "visitId"],
-    ["Diagnosis", "diagnosis"],
-    ["Body", "bodyFinding"],
-    ["Score", "scoreDisplay"],
-    ["Inference", "inference"],
-    ["Remarks", "remarks"],
+    ["Sl. No", "serialDisplay"],
+    ["Date of FU", "date"],
+    ["Acute inflammation", "acuteInflammation"],
+    ["Chronic inflammation", "chronicInflammation"],
   ];
   return (
     <div>
@@ -459,16 +609,12 @@ export function PatientProfile({
             <StatusBadge status={patient.status} />
             <Button
               variant="secondary"
-              onClick={() =>
-                toast.info(
-                  "Edit flow uses the same validated patient form in the production implementation.",
-                )
-              }
+              onClick={() => setEditPersonalOpen(true)}
             >
               <Edit3 className="size-4" />
-              Edit
+              Edit personal info
             </Button>
-            <Button variant="secondary" onClick={() => setDrawer("visits")}>
+            <Button variant="secondary" onClick={() => openAddDrawer("visits")}>
               <CalendarPlus className="size-4" />
               Add record
             </Button>
@@ -516,15 +662,19 @@ export function PatientProfile({
         </div>
         <div className="p-5">
           {tab === "overview" ? (
+            <div className="space-y-5">
             <div className="grid gap-5 lg:grid-cols-3">
               <section className="rounded-xl bg-slate-50 p-5">
                 <h3 className="text-sm font-bold">Patient details</h3>
                 <dl className="mt-4 space-y-3 text-sm">
                   {[
-                    ["Phone", patient.phone],
+                    ["Default contact", getPatientDisplayPhone(patient)],
                     ["Email", patient.email || "Not provided"],
                     ["Police station", patient.policeStation || "Not recorded"],
-                    ["Location", `${patient.city}, ${patient.state}`],
+                    [
+                      "Location",
+                      `${patient.city}, ${patient.state}${patient.country ? `, ${patient.country}` : ""}`,
+                    ],
                     ["Occupation", patient.occupation],
                     ["Education", patient.education],
                     ["Monthly income", patient.monthlyFamilyIncome || "Not recorded"],
@@ -543,6 +693,39 @@ export function PatientProfile({
                     </div>
                   ))}
                 </dl>
+                <PatientPhoneDefaultEditor
+                  patient={patient}
+                  onUpdate={updatePatient}
+                />
+                {(patient.wageLossPerMonthRs ||
+                  patient.daysAbsentFromWorkPerMonth ||
+                  patient.treatmentCostPerMonthRs ||
+                  patient.otherSocioEconomicInfo) && (
+                  <dl className="mt-4 space-y-2 border-t border-slate-200 pt-4 text-sm">
+                    {patient.wageLossPerMonthRs ? (
+                      <div className="flex justify-between gap-4">
+                        <dt className="text-slate-500">Wage loss / month</dt>
+                        <dd className="font-semibold">Rs. {patient.wageLossPerMonthRs}</dd>
+                      </div>
+                    ) : null}
+                    {patient.daysAbsentFromWorkPerMonth ? (
+                      <div className="flex justify-between gap-4">
+                        <dt className="text-slate-500">Days absent / month</dt>
+                        <dd className="font-semibold">
+                          {patient.daysAbsentFromWorkPerMonth}
+                        </dd>
+                      </div>
+                    ) : null}
+                    {patient.treatmentCostPerMonthRs ? (
+                      <div className="flex justify-between gap-4">
+                        <dt className="text-slate-500">Treatment cost / month</dt>
+                        <dd className="font-semibold">
+                          Rs. {patient.treatmentCostPerMonthRs}
+                        </dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                )}
               </section>
               <section className="rounded-xl bg-slate-50 p-5">
                 <h3 className="text-sm font-bold">Disease profile</h3>
@@ -575,6 +758,14 @@ export function PatientProfile({
                   Synthetic record
                 </Badge>
               </section>
+            </div>
+            <SectionDataChecklist
+              items={sectionStatusItems}
+              onSelectSection={(key) => {
+                if (key === "clinical-dataset") setTab("clinical-dataset");
+                else setTab(key as keyof ClinicalRecords | "overview");
+              }}
+            />
             </div>
           ) : (
             <div>
@@ -616,7 +807,7 @@ export function PatientProfile({
                 ) : tab === "clinical-dataset" ? null : (
                   <Button
                     size="sm"
-                    onClick={() => setDrawer(tab as keyof ClinicalRecords)}
+                    onClick={() => openAddDrawer(tab as keyof ClinicalRecords)}
                   >
                     <Plus className="size-4" />
                     Add record
@@ -857,8 +1048,8 @@ export function PatientProfile({
               ) : tab === "pouchoscopies" ? (
                 !related.pouchoscopies.length ? (
                   <EmptyState
-                    title="No pouchoscopy records"
-                    description="Add a pouchoscopy assessment linked to a visit."
+                    title="No histology pouchoscopy records"
+                    description="Add a histology pouchoscopy follow-up row."
                   />
                 ) : (
                   <div className="overflow-x-auto">
@@ -873,20 +1064,17 @@ export function PatientProfile({
                         </tr>
                       </thead>
                       <tbody>
-                        {(related.pouchoscopies as PouchoscopyRecord[]).map(
-                          (row) => (
+                        {histologyPouchoscopyRows.map((row, index) => (
                             <tr key={row.id} className="border-t border-slate-100">
                               {pouchoscopyColumns.map(([label, key]) => (
                                 <td
                                   key={label}
                                   className="max-w-56 px-4 py-3 text-slate-600"
                                 >
-                                  {key === "date"
-                                    ? formatDate(row.date)
-                                    : key === "scoreDisplay"
-                                      ? row.scoreType
-                                        ? `${row.scoreType}: ${pouchoscopyScore(row) ?? "—"}`
-                                        : String(pouchoscopyScore(row) ?? "—")
+                                  {key === "serialDisplay"
+                                    ? String(row.serialNumber ?? index + 1)
+                                    : key === "date"
+                                      ? formatDate(row.date)
                                       : String(
                                           row[key as keyof PouchoscopyRecord] ??
                                             "—",
@@ -894,8 +1082,7 @@ export function PatientProfile({
                                 </td>
                               ))}
                             </tr>
-                          ),
-                        )}
+                          ))}
                       </tbody>
                     </table>
                   </div>
@@ -915,6 +1102,7 @@ export function PatientProfile({
                             {label}
                           </th>
                         ))}
+                        {actionsHeader}
                       </tr>
                     </thead>
                     <tbody>
@@ -935,6 +1123,14 @@ export function PatientProfile({
                                   : String(row[key] ?? "—")}
                             </td>
                           ))}
+                          <td className="px-4 py-3 text-right">
+                            <RecordRowActions
+                              onEdit={() => openEditVisit(row)}
+                              onDelete={() =>
+                                handleDeleteRecord("visits", row.id)
+                              }
+                            />
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -950,6 +1146,7 @@ export function PatientProfile({
                             {label}
                           </th>
                         ))}
+                        {actionsHeader}
                       </tr>
                     </thead>
                     <tbody>
@@ -971,6 +1168,14 @@ export function PatientProfile({
                                     : String(row[key] ?? "—")}
                             </td>
                           ))}
+                          <td className="px-4 py-3 text-right">
+                            <RecordRowActions
+                              onEdit={() => openEditSymptoms(row)}
+                              onDelete={() =>
+                                handleDeleteRecord("symptoms", row.id)
+                              }
+                            />
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1089,6 +1294,7 @@ export function PatientProfile({
                             {label}
                           </th>
                         ))}
+                        {actionsHeader}
                       </tr>
                     </thead>
                     <tbody>
@@ -1103,9 +1309,22 @@ export function PatientProfile({
                                 ? formatDate(row.date)
                                 : key === "mayoScore"
                                   ? String(endoscopyMayoScore(row) ?? "—")
-                                  : String(row[key as keyof EndoscopyRecord] ?? "—")}
+                                  : key === "uceisScore"
+                                    ? String(endoscopyUceisScore(row) ?? "—")
+                                    : String(
+                                        row[key as keyof EndoscopyRecord] ??
+                                          "—",
+                                      )}
                             </td>
                           ))}
+                          <td className="px-4 py-3 text-right">
+                            <RecordRowActions
+                              onEdit={() => openEditEndoscopy(row)}
+                              onDelete={() =>
+                                handleDeleteRecord("endoscopies", row.id)
+                              }
+                            />
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1195,6 +1414,7 @@ export function PatientProfile({
                               {k.replace(/([A-Z])/g, " $1")}
                             </th>
                           ))}
+                        {actionsHeader}
                       </tr>
                     </thead>
                     <tbody>
@@ -1220,6 +1440,45 @@ export function PatientProfile({
                                     : String(v ?? "—")}
                               </td>
                             ))}
+                          {typeof row.id === "string" ? (
+                            <td className="px-4 py-3 text-right">
+                              <RecordRowActions
+                                onEdit={() => {
+                                  const kind = tab as keyof ClinicalRecords;
+                                  if (kind === "relapses") {
+                                    setDrawerPrefill({
+                                      relapse: row as unknown as RelapseRecord,
+                                    });
+                                  } else if (kind === "pouchoscopies") {
+                                    setDrawerPrefill({
+                                      pouchoscopy:
+                                        row as unknown as PouchoscopyRecord,
+                                    });
+                                  } else if (kind === "ipaa") {
+                                    setDrawerPrefill({
+                                      ipaa: row as unknown as IPAARecord,
+                                    });
+                                  } else if (kind === "offspring") {
+                                    setDrawerPrefill({
+                                      offspring:
+                                        row as unknown as OffspringRecord,
+                                    });
+                                  } else if (kind === "surgeries") {
+                                    setDrawerPrefill({
+                                      surgery: row as unknown as SurgeryRecord,
+                                    });
+                                  }
+                                  setDrawer(kind);
+                                }}
+                                onDelete={() =>
+                                  handleDeleteRecord(
+                                    tab as keyof ClinicalRecords,
+                                    String(row.id),
+                                  )
+                                }
+                              />
+                            </td>
+                          ) : null}
                         </tr>
                       ))}
                     </tbody>
@@ -1230,15 +1489,49 @@ export function PatientProfile({
           )}
         </div>
       </Card>
+      {editPersonalOpen && patient && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/25 backdrop-blur-[1px]"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setEditPersonalOpen(false);
+          }}
+        >
+          <aside className="absolute right-0 top-0 h-full w-full max-w-3xl overflow-y-auto bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white p-5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-teal-700">
+                  Patient registry
+                </p>
+                <h2 className="text-lg font-bold">Edit personal information</h2>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={() => setEditPersonalOpen(false)}
+                aria-label="Close"
+              >
+                <X className="size-5" />
+              </Button>
+            </div>
+            <PatientEditForm
+              patient={patient}
+              onCancel={() => setEditPersonalOpen(false)}
+              onSaved={(updated) => {
+                updatePatient(updated);
+                setEditPersonalOpen(false);
+              }}
+            />
+          </aside>
+        </div>
+      )}
       {drawer && (
         <div
           className="fixed inset-0 z-50 bg-slate-950/25 backdrop-blur-[1px]"
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setDrawer(null);
+            if (e.target === e.currentTarget) closeDrawer();
           }}
         >
           <aside
-            className={`absolute right-0 top-0 h-full w-full overflow-y-auto bg-white shadow-2xl ${drawer === "visits" || drawer === "pregnancies" || drawer === "relapses" || drawer === "ipaa" || drawer === "pouchoscopies" ? "max-w-3xl" : drawer === "symptoms" || drawer === "eims" || drawer === "labs" || drawer === "histopathology" || drawer === "medications" ? "max-w-5xl" : drawer === "endoscopies" || drawer === "imaging" || drawer === "offspring" ? "max-w-2xl" : "max-w-lg"}`}
+            className={`absolute right-0 top-0 h-full w-full overflow-y-auto bg-white shadow-2xl ${drawer === "visits" || drawer === "pregnancies" || drawer === "relapses" || drawer === "ipaa" || drawer === "pouchoscopies" || drawer === "endoscopies" ? "max-w-3xl" : drawer === "symptoms" || drawer === "eims" || drawer === "labs" || drawer === "histopathology" || drawer === "medications" ? "max-w-5xl" : drawer === "imaging" || drawer === "offspring" ? "max-w-2xl" : "max-w-lg"}`}
           >
             {drawer === "visits" ? (
               <>
@@ -1251,7 +1544,7 @@ export function PatientProfile({
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={() => setDrawer(null)}
+                    onClick={() => closeDrawer()}
                     aria-label="Close"
                   >
                     <X className="size-5" />
@@ -1260,8 +1553,10 @@ export function PatientProfile({
                 <VisitForm
                   patientId={patientId}
                   visitCount={related.visits.length}
+                  patientVisits={related.visits as Visit[]}
+                  editingVisit={drawerPrefill?.visit ?? null}
                   lastVisit={lastVisit}
-                  onCancel={() => setDrawer(null)}
+                  onCancel={closeDrawer}
                   onSave={saveVisit}
                 />
               </>
@@ -1276,7 +1571,7 @@ export function PatientProfile({
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={() => setDrawer(null)}
+                    onClick={() => closeDrawer()}
                     aria-label="Close"
                   >
                     <X className="size-5" />
@@ -1285,8 +1580,10 @@ export function PatientProfile({
                 <SymptomForm
                   patientId={patientId}
                   visits={related.visits as Visit[]}
+                  patientRecords={related.symptoms as SymptomRecord[]}
+                  initialAssessment={drawerPrefill?.symptomRecords ?? null}
                   lastAssessment={lastSymptomAssessment}
-                  onCancel={() => setDrawer(null)}
+                  onCancel={closeDrawer}
                   onSave={saveSymptoms}
                 />
               </>
@@ -1301,7 +1598,7 @@ export function PatientProfile({
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={() => setDrawer(null)}
+                    onClick={() => closeDrawer()}
                     aria-label="Close"
                   >
                     <X className="size-5" />
@@ -1311,7 +1608,7 @@ export function PatientProfile({
                   patientId={patientId}
                   visits={related.visits as Visit[]}
                   lastAssessment={lastEimAssessment}
-                  onCancel={() => setDrawer(null)}
+                  onCancel={() => closeDrawer()}
                   onSave={saveEims}
                 />
               </>
@@ -1326,7 +1623,7 @@ export function PatientProfile({
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={() => setDrawer(null)}
+                    onClick={() => closeDrawer()}
                     aria-label="Close"
                   >
                     <X className="size-5" />
@@ -1335,7 +1632,7 @@ export function PatientProfile({
                 <LabForm
                   patientId={patientId}
                   visits={related.visits as Visit[]}
-                  onCancel={() => setDrawer(null)}
+                  onCancel={() => closeDrawer()}
                   onSave={saveLabs}
                 />
               </>
@@ -1344,13 +1641,13 @@ export function PatientProfile({
                 <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white p-5">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wide text-teal-700">
-                      Colonoscopy and endoscopic scores
+                      Colonoscopy and endoscopic
                     </p>
-                    <h2 className="text-lg font-bold">Add endoscopy</h2>
+                    <h2 className="text-lg font-bold">Add colonoscopy</h2>
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={() => setDrawer(null)}
+                    onClick={() => closeDrawer()}
                     aria-label="Close"
                   >
                     <X className="size-5" />
@@ -1359,8 +1656,10 @@ export function PatientProfile({
                 <EndoscopyForm
                   patientId={patientId}
                   visits={related.visits as Visit[]}
+                  patientRecords={related.endoscopies as EndoscopyRecord[]}
+                  editingRecord={drawerPrefill?.endoscopy ?? null}
                   lastEndoscopy={lastEndoscopy}
-                  onCancel={() => setDrawer(null)}
+                  onCancel={closeDrawer}
                   onSave={saveEndoscopy}
                 />
               </>
@@ -1375,7 +1674,7 @@ export function PatientProfile({
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={() => setDrawer(null)}
+                    onClick={() => closeDrawer()}
                     aria-label="Close"
                   >
                     <X className="size-5" />
@@ -1384,7 +1683,8 @@ export function PatientProfile({
                 <HistopathologyForm
                   patientId={patientId}
                   visits={related.visits as Visit[]}
-                  onCancel={() => setDrawer(null)}
+                  initialRecords={drawerPrefill?.histopathology ?? null}
+                  onCancel={closeDrawer}
                   onSave={saveHistopathology}
                 />
               </>
@@ -1399,7 +1699,7 @@ export function PatientProfile({
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={() => setDrawer(null)}
+                    onClick={() => closeDrawer()}
                     aria-label="Close"
                   >
                     <X className="size-5" />
@@ -1408,7 +1708,7 @@ export function PatientProfile({
                 <ImagingForm
                   patientId={patientId}
                   visits={related.visits as Visit[]}
-                  onCancel={() => setDrawer(null)}
+                  onCancel={() => closeDrawer()}
                   onSave={saveImaging}
                 />
               </>
@@ -1423,7 +1723,7 @@ export function PatientProfile({
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={() => setDrawer(null)}
+                    onClick={() => closeDrawer()}
                     aria-label="Close"
                   >
                     <X className="size-5" />
@@ -1432,7 +1732,7 @@ export function PatientProfile({
                 <MedicationForm
                   patientId={patientId}
                   visits={related.visits as Visit[]}
-                  onCancel={() => setDrawer(null)}
+                  onCancel={() => closeDrawer()}
                   onSave={saveMedications}
                 />
               </>
@@ -1447,7 +1747,7 @@ export function PatientProfile({
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={() => setDrawer(null)}
+                    onClick={() => closeDrawer()}
                     aria-label="Close"
                   >
                     <X className="size-5" />
@@ -1456,7 +1756,7 @@ export function PatientProfile({
                 <PregnancyForm
                   patientId={patientId}
                   existingRecords={related.pregnancies as PregnancyRecord[]}
-                  onCancel={() => setDrawer(null)}
+                  onCancel={() => closeDrawer()}
                   onSave={savePregnancy}
                 />
               </>
@@ -1471,7 +1771,7 @@ export function PatientProfile({
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={() => setDrawer(null)}
+                    onClick={() => closeDrawer()}
                     aria-label="Close"
                   >
                     <X className="size-5" />
@@ -1480,7 +1780,7 @@ export function PatientProfile({
                 <OffspringForm
                   patientId={patientId}
                   lastRecord={lastOffspring}
-                  onCancel={() => setDrawer(null)}
+                  onCancel={() => closeDrawer()}
                   onSave={saveOffspring}
                 />
               </>
@@ -1495,7 +1795,7 @@ export function PatientProfile({
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={() => setDrawer(null)}
+                    onClick={() => closeDrawer()}
                     aria-label="Close"
                   >
                     <X className="size-5" />
@@ -1504,7 +1804,8 @@ export function PatientProfile({
                 <RelapseForm
                   patientId={patientId}
                   visits={related.visits as Visit[]}
-                  onCancel={() => setDrawer(null)}
+                  editingRecord={drawerPrefill?.relapse ?? null}
+                  onCancel={closeDrawer}
                   onSave={saveRelapse}
                 />
               </>
@@ -1519,7 +1820,7 @@ export function PatientProfile({
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={() => setDrawer(null)}
+                    onClick={() => closeDrawer()}
                     aria-label="Close"
                   >
                     <X className="size-5" />
@@ -1528,7 +1829,7 @@ export function PatientProfile({
                 <IpaaForm
                   patientId={patientId}
                   visits={related.visits as Visit[]}
-                  onCancel={() => setDrawer(null)}
+                  onCancel={() => closeDrawer()}
                   onSave={saveIpaa}
                 />
               </>
@@ -1537,13 +1838,13 @@ export function PatientProfile({
                 <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white p-5">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wide text-teal-700">
-                      Pouchoscopy and histology
+                      Histology pouchoscopy
                     </p>
-                    <h2 className="text-lg font-bold">Add pouchoscopy</h2>
+                    <h2 className="text-lg font-bold">Add histology pouchoscopy</h2>
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={() => setDrawer(null)}
+                    onClick={() => closeDrawer()}
                     aria-label="Close"
                   >
                     <X className="size-5" />
@@ -1551,8 +1852,9 @@ export function PatientProfile({
                 </div>
                 <PouchoscopyForm
                   patientId={patientId}
-                  visits={related.visits as Visit[]}
-                  onCancel={() => setDrawer(null)}
+                  serialNumber={nextPouchoscopySl}
+                  editingRecord={drawerPrefill?.pouchoscopy ?? null}
+                  onCancel={closeDrawer}
                   onSave={savePouchoscopy}
                 />
               </>
@@ -1569,7 +1871,7 @@ export function PatientProfile({
               </div>
               <Button
                 variant="ghost"
-                onClick={() => setDrawer(null)}
+                onClick={() => closeDrawer()}
                 aria-label="Close"
               >
                 <X className="size-5" />
@@ -1649,7 +1951,7 @@ export function PatientProfile({
               </label>
             </div>
             <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white p-5">
-              <Button variant="secondary" onClick={() => setDrawer(null)}>
+              <Button variant="secondary" onClick={() => closeDrawer()}>
                 Cancel
               </Button>
               <Button onClick={saveRecord}>Save record</Button>

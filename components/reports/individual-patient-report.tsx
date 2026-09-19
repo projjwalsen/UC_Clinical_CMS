@@ -18,6 +18,7 @@ import {
 } from "@/lib/report-labels";
 import { formatDurationMonths } from "@/lib/report-calculations";
 import { formatDate } from "@/lib/utils";
+import { getPatientDisplayPhone } from "@/lib/patient-contact";
 
 export function IndividualPatientReport({ patientId }: { patientId: string }) {
   const { patients, clinicalDatasetRecords } = useDemoStore();
@@ -90,7 +91,7 @@ export function IndividualPatientReport({ patientId }: { patientId: string }) {
             <Row label="IBD code" value={row.ibdCode} />
             <Row label="Patient ID" value={patient.id} />
             <Row label="Name" value={patient.name} />
-            <Row label="Phone" value={patient.phone} />
+            <Row label="Phone (default contact)" value={getPatientDisplayPhone(patient)} />
           </Section>
           <Section title="Demographics">
             <Row label="Age" value={String(patient.age)} />

@@ -137,6 +137,7 @@ export const seedPatients: Patient[] = Array.from({ length: 47 }, (_, i) => {
     address: `${21 + i}, Lakeview Road`,
     city,
     state: states[city],
+    country: "India",
     pinCode: `${700001 + i}`,
     policeStation: policeStations[i % policeStations.length],
     phone: `90000${String(12000 + i)}`,
@@ -317,7 +318,10 @@ export const seedRecords: ClinicalRecords = {
           : "Erythema and friability noted.",
       baronScore: i % 4,
       mayoEndoscopicScore: i % 4,
-      uceis: i % 8,
+      uceisVascularPattern: i % 3,
+      uceisBleeding: (i + 1) % 4,
+      uceisErosionsUlcers: (i + 2) % 4,
+      uceis: (i % 3) + ((i + 1) % 4) + ((i + 2) % 4),
       diseaseExtent: ["E1", "E2", "E3"][i % 3],
       remarks: i % 3 === 0 ? "Repeat in 6 months if symptoms persist." : undefined,
     })),
@@ -333,7 +337,13 @@ export const seedRecords: ClinicalRecords = {
         parameter: "Chronic Inflammatory Cells",
         present: "Yes",
         scoreGrade: "Moderate",
-        histopathologyScore: 2 + (i % 5),
+        robartsChronicInflammatoryInfiltrate: 1 + (i % 3),
+        robartsNeutrophilsLaminaPropria: i % 3,
+        robartsNeutrophilsEpithelium: 1,
+        robartsErosionUlceration: i % 2,
+        robartsErosionUlcerationCode: i % 2 === 0 ? "0" : "1-recovering",
+        histopathologyScore:
+          (1 + (i % 3)) * 1 + (i % 3) * 2 + 1 * 3 + (i % 2) * 5,
         remarks: "No dysplasia identified.",
       },
       {
@@ -345,6 +355,13 @@ export const seedRecords: ClinicalRecords = {
         parameter: "Cryptitis",
         present: i % 2 === 0 ? "Yes" : "No",
         scoreGrade: i % 2 === 0 ? "Mild" : undefined,
+        robartsChronicInflammatoryInfiltrate: 1 + (i % 3),
+        robartsNeutrophilsLaminaPropria: i % 3,
+        robartsNeutrophilsEpithelium: 1,
+        robartsErosionUlceration: i % 2,
+        robartsErosionUlcerationCode: i % 2 === 0 ? "0" : "1-recovering",
+        histopathologyScore:
+          (1 + (i % 3)) * 1 + (i % 3) * 2 + 1 * 3 + (i % 2) * 5,
         remarks: "Reviewed by pathologist.",
       },
     ]),
@@ -453,24 +470,23 @@ export const seedRecords: ClinicalRecords = {
     })),
   pouchoscopies: seedPatients
     .filter((_, i) => i % 7 === 5)
-    .map((p, i) => ({
-      id: `POUCH-${i}`,
-      patientId: p.id,
-      visitId: `${p.id}-V2`,
-      date: monthsAgo(3 + i),
-      cuffFindings: "Mild erythema at cuff",
-      bodyFinding: i % 2 === 0 ? "Normal" : "Ulcer",
-      inletFindings: "No significant abnormality",
-      tipOfPouchFindings: "Healthy mucosa",
-      prePouchIleumFindings: "Unremarkable",
-      diagnosis: "Pouchitis",
-      acuteInflammation: i % 2 === 0 ? "Yes" : "No",
-      chronicInflammation: "Yes",
-      scoreType: i % 2 === 0 ? "PDAI" : "PAS",
-      scoreValue: 3 + (i % 4),
-      inference: "Mild active inflammation",
-      remarks: "Review in 8 weeks.",
-    })),
+    .flatMap((p, pi) =>
+      [0, 1].map((n) => ({
+        id: `POUCH-${pi}-${n}`,
+        patientId: p.id,
+        serialNumber: n + 1,
+        date: monthsAgo(4 + pi + n * 2),
+        acuteInflammation:
+          n === 0
+            ? "Moderate polymorph infiltration"
+            : "Mild cryptitis",
+        chronicInflammation:
+          n === 0 ? "Patchy chronic changes" : "Minimal chronic inflammation",
+        histologyAttachmentChecked: n === 0,
+        histologyAttachmentFileName:
+          n === 0 ? `histology-fu-${pi + 1}.pdf` : undefined,
+      })),
+    ),
   outcomes: seedPatients.map((p, i) => ({
     id: `OUT-${i}`,
     patientId: p.id,

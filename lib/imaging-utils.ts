@@ -23,6 +23,17 @@ export function buildImagingFormState(
   };
 }
 
+export function imagingRecordToFormState(record: ImagingRecord): ImagingFormState {
+  return {
+    date: record.date,
+    visitId: record.visitId,
+    investigationType: record.investigationType,
+    findings: record.findings ?? "",
+    impression: record.impression ?? "",
+    remarks: record.remarks ?? "",
+  };
+}
+
 export function imagingFormToRecord(
   form: ImagingFormState,
   patientId: string,

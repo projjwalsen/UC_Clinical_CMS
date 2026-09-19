@@ -22,6 +22,33 @@ export type RelapseFormState = {
   remarks: string;
 };
 
+const str = (value?: string | number) =>
+  value === undefined || value === null ? "" : String(value);
+
+export function relapseRecordToFormState(record: RelapseRecord): RelapseFormState {
+  return {
+    date: record.date,
+    visitId: record.visitId,
+    relapseCause: record.relapseCause ?? record.cause ?? "",
+    causeOther: record.causeOther ?? "",
+    admission: relapseAdmission(record) ?? "",
+    steroid: record.steroid ?? "",
+    oralSteroid: record.oralSteroid ?? "",
+    ivSteroid: record.ivSteroid ?? "",
+    infection: record.infection ?? "",
+    infectionType: record.infectionType ?? "",
+    rescueTherapy: record.rescueTherapy ?? "",
+    rescueTherapyType: record.rescueTherapyType ?? "",
+    rescueTherapyFailure: record.rescueTherapyFailure ?? "",
+    rescueOutcome: record.rescueOutcome ?? record.outcome ?? "",
+    admissionDurationDays: str(record.admissionDurationDays),
+    colectomy: record.colectomy ?? "",
+    anticoagulation: record.anticoagulation ?? "",
+    death: record.death ?? "",
+    remarks: record.remarks ?? "",
+  };
+}
+
 export function buildRelapseFormState(
   defaultVisitId = "",
   today = "2026-09-07",

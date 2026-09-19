@@ -47,7 +47,7 @@ export function buildEimFormState(
       };
     }
     return {
-      date: today,
+      date: lastAssessment[0].date,
       visitId: lastAssessment[0].visitId ?? defaultVisitId,
       ...getEimAssessmentMeta(lastAssessment),
       manifestations,
@@ -81,6 +81,7 @@ export function eimFormToRecords(
   form: EimFormState,
   patientId: string,
   assessmentId: string,
+  existingIdsByManifestation?: Record<string, string>,
 ): EIMRecord[] {
   const veinThrombosed = form.veinThrombosed || undefined;
   const remarks = form.remarks || undefined;
@@ -88,7 +89,9 @@ export function eimFormToRecords(
   return EIM_MANIFESTATIONS.map((manifestation, index) => {
     const row = form.manifestations[manifestation];
     return {
-      id: `${assessmentId}-${index + 1}`,
+      id:
+        existingIdsByManifestation?.[manifestation] ??
+        `${assessmentId}-${index + 1}`,
       patientId,
       visitId: form.visitId || undefined,
       date: form.date,

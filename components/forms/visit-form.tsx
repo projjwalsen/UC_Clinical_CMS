@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { VisitLinkedDataBanner } from "@/components/forms/visit-linked-data-banner";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   ALCOHOL_STATUS,
@@ -16,17 +17,26 @@ import {
   VISIT_TYPE,
   YES_NO,
 } from "@/data/lookups";
+import { MayoScoreSection } from "@/components/forms/mayo-score-section";
 import {
   buildVisitFormState,
   calculateBmi,
+  mayoScoresFromVisitForm,
   nextVisitId,
   visitFormToRecord,
+  visitToFormState,
   type VisitFormState,
 } from "@/lib/visit-utils";
+import { completeMayoSeverity, partialMayoSeverity } from "@/lib/mayo-score";
 import { Button, Field, Input, Select, Textarea } from "@/components/ui/core";
 import type { Visit } from "@/types/clinical";
 
-const steps = ["Visit & epidemiology", "Physical examination", "Review & save"];
+const steps = [
+  "Visit & epidemiology",
+  "Physical examination",
+  "Clinical follow-up",
+  "Review & save",
+];
 
 function Section({
   title,
@@ -53,28 +63,46 @@ function Section({
 export function VisitForm({
   patientId,
   visitCount,
+  patientVisits,
+  editingVisit,
   lastVisit,
   onCancel,
   onSave,
 }: {
   patientId: string;
   visitCount: number;
+  patientVisits: Visit[];
+  editingVisit?: Visit | null;
   lastVisit?: Visit | null;
   onCancel: () => void;
   onSave: (visit: Visit) => void;
 }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<VisitFormState>(() =>
-    buildVisitFormState(visitCount, lastVisit ?? null),
+    editingVisit
+      ? visitToFormState(editingVisit)
+      : buildVisitFormState(visitCount, lastVisit ?? null),
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const visitId = useMemo(
-    () => nextVisitId(patientId, visitCount),
-    [patientId, visitCount],
+  const [visitId, setVisitId] = useState(
+    () => editingVisit?.id ?? nextVisitId(patientId, visitCount),
   );
+  const [loadedExistingVisit, setLoadedExistingVisit] = useState(
+    () => !!editingVisit,
+  );
+
+  useEffect(() => {
+    const existing = patientVisits.find((visit) => visit.date === form.date);
+    if (existing && existing.id !== visitId) {
+      setForm(visitToFormState(existing));
+      setVisitId(existing.id);
+      setLoadedExistingVisit(true);
+    }
+  }, [form.date, patientVisits, visitId]);
   const heightM = Number(form.heightM);
   const weightKg = Number(form.weightKg);
   const bmi = calculateBmi(heightM, weightKg);
+  const mayoScores = useMemo(() => mayoScoresFromVisitForm(form), [form]);
 
   const set = (key: keyof VisitFormState, value: string) => {
     setForm((f) => ({ ...f, [key]: value }));
@@ -128,9 +156,9 @@ export function VisitForm({
     </div>
   );
 
-  const validateStep = () => {
+  const validateStep = (targetStep = step) => {
     const next: Record<string, string> = {};
-    if (step === 0) {
+    if (targetStep === 0) {
       if (!form.date) next.date = "Visit date is required.";
       if (!form.type) next.type = "Visit type is required.";
       if (form.heightM && Number(form.heightM) <= 0)
@@ -138,8 +166,38 @@ export function VisitForm({
       if (form.weightKg && Number(form.weightKg) <= 0)
         next.weightKg = "Enter a valid weight in kg.";
     }
+    if (targetStep === 2) {
+      if (!form.mayoStoolFrequency)
+        next.mayoStoolFrequency = "Select stool frequency (I).";
+      if (!form.mayoRectalBleeding)
+        next.mayoRectalBleeding = "Select rectal bleeding (II).";
+      if (!form.mayoEndoscopicFindings)
+        next.mayoEndoscopicFindings = "Select endoscopic findings (III).";
+      if (!form.mayoPhysicianGlobalAssessment)
+        next.mayoPhysicianGlobalAssessment =
+          "Select physician's global assessment (IV).";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
+  };
+
+  const validateForSave = () => {
+    const visitErrors: Record<string, string> = {};
+    const mayoErrors: Record<string, string> = {};
+    if (!form.date) visitErrors.date = "Visit date is required.";
+    if (!form.type) visitErrors.type = "Visit type is required.";
+    if (!form.mayoStoolFrequency)
+      mayoErrors.mayoStoolFrequency = "Select stool frequency (I).";
+    if (!form.mayoRectalBleeding)
+      mayoErrors.mayoRectalBleeding = "Select rectal bleeding (II).";
+    if (!form.mayoEndoscopicFindings)
+      mayoErrors.mayoEndoscopicFindings = "Select endoscopic findings (III).";
+    if (!form.mayoPhysicianGlobalAssessment)
+      mayoErrors.mayoPhysicianGlobalAssessment =
+        "Select physician's global assessment (IV).";
+    const merged = { ...visitErrors, ...mayoErrors };
+    setErrors(merged);
+    return Object.keys(merged).length === 0;
   };
 
   const next = () => {
@@ -147,14 +205,14 @@ export function VisitForm({
   };
 
   const submit = () => {
-    if (!validateStep()) return;
+    if (!validateForSave()) return;
     onSave(visitFormToRecord(form, visitId, patientId));
   };
 
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-slate-100 px-6 py-4">
-        <div className="mb-3 grid grid-cols-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="mb-3 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white sm:grid-cols-4">
           {steps.map((label, i) => (
             <div
               key={label}
@@ -185,6 +243,9 @@ export function VisitForm({
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
+        {loadedExistingVisit && (
+          <VisitLinkedDataBanner message="A visit already exists on this date. You are editing that visit; saving will update it." />
+        )}
         {step === 0 && (
           <div className="space-y-8">
             <Section title="Visit details">
@@ -282,19 +343,24 @@ export function VisitForm({
 
         {step === 2 && (
           <div className="space-y-8">
+            <MayoScoreSection
+              stoolFrequency={form.mayoStoolFrequency}
+              rectalBleeding={form.mayoRectalBleeding}
+              endoscopicFindings={form.mayoEndoscopicFindings}
+              physicianGlobal={form.mayoPhysicianGlobalAssessment}
+              partialMayoScore={mayoScores.partialMayoScore}
+              completeMayoScore={mayoScores.completeMayoScore}
+              errors={errors}
+              onChange={(key, value) =>
+                set(key as keyof VisitFormState, value)
+              }
+            />
+
             <Section title="Clinical follow-up">
-              {input("partialMayoScore", "Partial Mayo score", false, "number")}
-              {input("completeMayoScore", "Complete Mayo score", false, "number")}
               {select("clinicalState", "Clinical state", CLINICAL_STATE)}
               {textarea("complication", "Complication")}
               {input("newEim", "New EIM")}
               {input("uceis", "UCEIS", false, "number")}
-              {input(
-                "mayoEndoscopicScore",
-                "Mayo endoscopic score",
-                false,
-                "number",
-              )}
               {select("admission", "Admission", YES_NO)}
               {textarea("specialComment", "Special comment")}
             </Section>
@@ -303,7 +369,11 @@ export function VisitForm({
               {select("montrealExtent", "Montreal extent", DISEASE_EXTENT)}
               {select("montrealSeverity", "Montreal severity", MONTREAL_SEVERITY)}
             </Section>
+          </div>
+        )}
 
+        {step === 3 && (
+          <div className="space-y-6">
             <div>
               <h3 className="mb-4 text-sm font-bold text-slate-800">
                 Review visit summary
@@ -313,9 +383,30 @@ export function VisitForm({
                   ["Visit type", form.type],
                   ["Date", form.date],
                   ["Clinical state", form.clinicalState],
-                  ["Montreal", `${form.montrealExtent} / ${form.montrealSeverity}`],
-                  ["Partial Mayo", form.partialMayoScore || "—"],
-                  ["Weight / BMI", form.weightKg ? `${form.weightKg} kg · ${bmi || "—"}` : "—"],
+                  [
+                    "Montreal",
+                    `${form.montrealExtent} / ${form.montrealSeverity}`,
+                  ],
+                  [
+                    "Partial Mayo",
+                    mayoScores.partialMayoScore !== undefined
+                      ? `${mayoScores.partialMayoScore} (${partialMayoSeverity(mayoScores.partialMayoScore)})`
+                      : "—",
+                  ],
+                  [
+                    "Complete Mayo",
+                    mayoScores.completeMayoScore !== undefined
+                      ? `${mayoScores.completeMayoScore} (${completeMayoSeverity(mayoScores.completeMayoScore)})`
+                      : "—",
+                  ],
+                  [
+                    "Mayo endoscopic (III)",
+                    mayoScores.mayoEndoscopicScore ?? "—",
+                  ],
+                  [
+                    "Weight / BMI",
+                    form.weightKg ? `${form.weightKg} kg · ${bmi || "—"}` : "—",
+                  ],
                   ["Smoking", form.smokingStatus],
                   ["NSAID use", form.nsaidUse],
                 ].map(([label, value]) => (

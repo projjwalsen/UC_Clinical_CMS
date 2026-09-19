@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/core";
 import { downloadCsv, formatDate } from "@/lib/utils";
 import type { Patient } from "@/types/clinical";
+import { getPatientDisplayPhone } from "@/lib/patient-contact";
 
 export function PatientDirectory({
   onPatient,
@@ -57,7 +58,7 @@ export function PatientDirectory({
         .filter(
           (p) =>
             !p.archived &&
-            `${p.id} ${p.name} ${p.phone}`
+            `${p.id} ${p.name} ${getPatientDisplayPhone(p)} ${p.phone} ${p.alternatePhone ?? ""}`
               .toLowerCase()
               .includes(query.toLowerCase()) &&
             (extent === "All" || p.diseaseExtent === extent) &&
@@ -252,7 +253,9 @@ export function PatientDirectory({
                     <td className="px-4 py-3 text-slate-600">{p.age}</td>
                     <td className="px-4 py-3 text-slate-600">{p.gender}</td>
                     {columns.phone && (
-                      <td className="px-4 py-3 text-slate-600">{p.phone}</td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {getPatientDisplayPhone(p)}
+                      </td>
                     )}
                     {columns.registered && (
                       <td className="px-4 py-3 text-slate-600">

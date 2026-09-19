@@ -12,6 +12,7 @@ import {
 import {
   buildRelapseFormState,
   relapseFormToRecord,
+  relapseRecordToFormState,
   type RelapseFormState,
 } from "@/lib/relapse-utils";
 import { Button, Field, Input, Select, Textarea } from "@/components/ui/core";
@@ -60,17 +61,24 @@ function YesNoField({
 export function RelapseForm({
   patientId,
   visits,
+  editingRecord,
   onCancel,
   onSave,
 }: {
   patientId: string;
   visits: Visit[];
+  editingRecord?: RelapseRecord | null;
   onCancel: () => void;
   onSave: (record: RelapseRecord) => void;
 }) {
   const defaultVisitId = visits[0]?.id ?? "";
   const [form, setForm] = useState<RelapseFormState>(() =>
-    buildRelapseFormState(defaultVisitId),
+    editingRecord
+      ? relapseRecordToFormState(editingRecord)
+      : buildRelapseFormState(defaultVisitId),
+  );
+  const [recordId] = useState(
+    () => editingRecord?.id ?? `REL-${patientId}-${Date.now()}`,
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -104,7 +112,7 @@ export function RelapseForm({
   const submit = () => {
     if (!validate()) return;
     onSave(
-      relapseFormToRecord(form, patientId, `REL-${patientId}-${Date.now()}`),
+      relapseFormToRecord(form, patientId, recordId),
     );
   };
 

@@ -7,10 +7,13 @@ import {
   parametersForSection,
 } from "@/data/histology-lookups";
 import { YES_NO } from "@/data/lookups";
+import { RobartsScoreSection } from "@/components/forms/robarts-score-section";
 import {
   buildHistopathologyFormState,
+  buildHistopathologyFormStateFromRecords,
   emptyHistopathologyRow,
   histopathologyFormToRecords,
+  robartsScoreFromHistopathologyForm,
   type HistopathologyFormState,
   type HistopathologyRowState,
 } from "@/lib/histopathology-utils";
@@ -30,7 +33,6 @@ function applyRowPatch(
       parameter: "",
       present: "",
       scoreGrade: "",
-      histopathologyScore: "",
       remarks: row.remarks,
     };
   }
@@ -41,22 +43,30 @@ function applyRowPatch(
 export function HistopathologyForm({
   patientId,
   visits,
+  initialRecords,
   onCancel,
   onSave,
 }: {
   patientId: string;
   visits: Visit[];
+  initialRecords?: HistopathologyRecord[] | null;
   onCancel: () => void;
   onSave: (records: HistopathologyRecord[]) => void;
 }) {
   const defaultVisitId = visits[0]?.id ?? "";
   const [form, setForm] = useState<HistopathologyFormState>(() =>
-    buildHistopathologyFormState(defaultVisitId),
+    initialRecords?.length
+      ? buildHistopathologyFormStateFromRecords(initialRecords, defaultVisitId)
+      : buildHistopathologyFormState(defaultVisitId),
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const batchId = useMemo(
     () => `HIST-${patientId}-${Date.now()}`,
     [patientId],
+  );
+  const histopathologyScore = useMemo(
+    () => robartsScoreFromHistopathologyForm(form),
+    [form],
   );
 
   const updateRow = (id: string, patch: Partial<HistopathologyRowState>) => {
@@ -89,9 +99,27 @@ export function HistopathologyForm({
     }));
   };
 
+  const updateRobarts = (key: string, value: string) => {
+    setForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
+    setErrors((current) => ({ ...current, [key]: "" }));
+  };
+
   const validate = () => {
     const next: Record<string, string> = {};
     if (!form.date) next.date = "Examination date is required.";
+    if (!form.robartsChronicInflammatoryInfiltrate)
+      next.robartsChronicInflammatoryInfiltrate =
+        "Select chronic inflammatory infiltrate.";
+    if (!form.robartsNeutrophilsLaminaPropria)
+      next.robartsNeutrophilsLaminaPropria =
+        "Select neutrophils in lamina propria.";
+    if (!form.robartsNeutrophilsEpithelium)
+      next.robartsNeutrophilsEpithelium = "Select neutrophils in epithelium.";
+    if (!form.robartsErosionUlceration)
+      next.robartsErosionUlceration = "Select erosion or ulceration.";
     if (!form.rows.length) next.rows = "Add at least one parameter.";
     form.rows.forEach((row) => {
       if (!row.section) next[row.id] = "Select a section.";
@@ -138,6 +166,18 @@ export function HistopathologyForm({
             </Select>
           </Field>
         </div>
+
+        <RobartsScoreSection
+          chronicInflammatoryInfiltrate={
+            form.robartsChronicInflammatoryInfiltrate
+          }
+          neutrophilsLaminaPropria={form.robartsNeutrophilsLaminaPropria}
+          neutrophilsEpithelium={form.robartsNeutrophilsEpithelium}
+          erosionUlceration={form.robartsErosionUlceration}
+          histopathologyScore={histopathologyScore}
+          errors={errors}
+          onChange={updateRobarts}
+        />
 
         <div className="sticky top-0 z-10 mb-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
           <div>
@@ -242,20 +282,6 @@ export function HistopathologyForm({
                       placeholder="e.g. Mild, Grade 2"
                     />
                   </Field>
-                  <Field label="Histopathology score">
-                    <Input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={row.histopathologyScore}
-                      onChange={(e) =>
-                        updateRow(row.id, {
-                          histopathologyScore: e.target.value,
-                        })
-                      }
-                      placeholder="Examination summary score"
-                    />
-                  </Field>
                   <div className="md:col-span-2 xl:col-span-3">
                     <Field label="Remarks">
                       <Textarea
@@ -275,8 +301,8 @@ export function HistopathologyForm({
 
         <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-600">
           {form.rows.length} parameter{form.rows.length === 1 ? "" : "s"} in
-          this batch. Each row saves as a separate histopathology record linked
-          to the visit.
+          this examination. The Robarts histopathology score above applies once
+          per save and is stored with each parameter row for this batch.
         </div>
       </div>
 

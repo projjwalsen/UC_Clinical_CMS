@@ -1,4 +1,5 @@
 import type { Patient } from "@/types/clinical";
+import { getPatientDisplayPhone } from "@/lib/patient-contact";
 import type {
   ClinicalDatasetRecord,
   ClinicalDatasetReportRow,
@@ -26,7 +27,7 @@ export function buildClinicalReportRows(
       const row: ClinicalDatasetReportRow = {
         ...record,
         patientName: patient.name,
-        phoneNumber: patient.phone,
+        phoneNumber: getPatientDisplayPhone(patient),
         age: patient.age,
         sex: patientSexCode(patient),
       };

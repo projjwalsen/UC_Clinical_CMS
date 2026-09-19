@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { useDemoStore } from "@/lib/demo-store";
+import { getPatientDisplayPhone } from "@/lib/patient-contact";
 import { Badge, Card, Input } from "@/components/ui/core";
 import { Dashboard } from "@/components/dashboard/dashboard";
 import { PatientDirectory } from "@/components/patients/patient-directory";
@@ -94,7 +95,7 @@ export function AppShell({
         .filter(
           (p) =>
             !p.archived &&
-            `${p.id} ${p.name} ${p.phone}`
+            `${p.id} ${p.name} ${getPatientDisplayPhone(p)} ${p.phone} ${p.alternatePhone ?? ""}`
               .toLowerCase()
               .includes(search.toLowerCase()),
         )

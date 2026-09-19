@@ -2,40 +2,31 @@ import type { PouchoscopyRecord } from "@/types/clinical";
 
 export type PouchoscopyFormState = {
   date: string;
-  visitId: string;
-  cuffFindings: string;
-  bodyFinding: string;
-  inletFindings: string;
-  tipOfPouchFindings: string;
-  prePouchIleumFindings: string;
-  diagnosis: string;
   acuteInflammation: string;
   chronicInflammation: string;
-  scoreType: string;
-  scoreValue: string;
-  inference: string;
-  remarks: string;
+  histologyAttachmentChecked: boolean;
+  histologyAttachmentFileName: string;
 };
 
-export function buildPouchoscopyFormState(
-  defaultVisitId = "",
-  today = "2026-09-07",
+export function pouchoscopyRecordToFormState(
+  record: PouchoscopyRecord,
 ): PouchoscopyFormState {
   return {
-    date: today,
-    visitId: defaultVisitId,
-    cuffFindings: "",
-    bodyFinding: "",
-    inletFindings: "",
-    tipOfPouchFindings: "",
-    prePouchIleumFindings: "",
-    diagnosis: "",
+    date: record.date,
+    acuteInflammation: record.acuteInflammation ?? "",
+    chronicInflammation: record.chronicInflammation ?? "",
+    histologyAttachmentChecked: !!record.histologyAttachmentChecked,
+    histologyAttachmentFileName: record.histologyAttachmentFileName ?? "",
+  };
+}
+
+export function buildPouchoscopyFormState(): PouchoscopyFormState {
+  return {
+    date: "",
     acuteInflammation: "",
     chronicInflammation: "",
-    scoreType: "",
-    scoreValue: "",
-    inference: "",
-    remarks: "",
+    histologyAttachmentChecked: false,
+    histologyAttachmentFileName: "",
   };
 }
 
@@ -43,28 +34,34 @@ export function pouchoscopyFormToRecord(
   form: PouchoscopyFormState,
   patientId: string,
   id: string,
+  serialNumber: number,
 ): PouchoscopyRecord {
-  const num = (value: string) => (value === "" ? undefined : Number(value));
   return {
     id,
     patientId,
-    visitId: form.visitId,
+    serialNumber,
     date: form.date,
-    cuffFindings: form.cuffFindings || undefined,
-    bodyFinding: form.bodyFinding || undefined,
-    inletFindings: form.inletFindings || undefined,
-    tipOfPouchFindings: form.tipOfPouchFindings || undefined,
-    prePouchIleumFindings: form.prePouchIleumFindings || undefined,
-    diagnosis: form.diagnosis || undefined,
-    acuteInflammation: form.acuteInflammation || undefined,
-    chronicInflammation: form.chronicInflammation || undefined,
-    scoreType: form.scoreType || undefined,
-    scoreValue: num(form.scoreValue),
-    inference: form.inference || undefined,
-    remarks: form.remarks || undefined,
+    acuteInflammation: form.acuteInflammation.trim() || undefined,
+    chronicInflammation: form.chronicInflammation.trim() || undefined,
+    histologyAttachmentChecked: form.histologyAttachmentChecked || undefined,
+    histologyAttachmentFileName: form.histologyAttachmentChecked
+      ? form.histologyAttachmentFileName || undefined
+      : undefined,
   };
 }
 
-export function pouchoscopyScore(record: PouchoscopyRecord) {
-  return record.scoreValue ?? record.score;
+export function pouchoscopyAttachmentLabel(record: PouchoscopyRecord) {
+  if (!record.histologyAttachmentChecked) return "—";
+  return record.histologyAttachmentFileName?.trim() || "Attached";
+}
+
+export function nextPouchoscopySerialNumber(
+  records: PouchoscopyRecord[],
+  patientId: string,
+) {
+  const forPatient = records.filter((r) => r.patientId === patientId);
+  if (!forPatient.length) return 1;
+  return (
+    Math.max(...forPatient.map((r) => r.serialNumber ?? 0), 0) + 1
+  );
 }
