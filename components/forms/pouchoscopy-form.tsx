@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { FormSaveActions } from "@/components/forms/form-save-actions";
 import {
   buildPouchoscopyFormState,
   pouchoscopyFormToRecord,
   pouchoscopyRecordToFormState,
   type PouchoscopyFormState,
 } from "@/lib/pouchoscopy-utils";
-import { Button, Field, Input, Textarea } from "@/components/ui/core";
+import { Field, Input, Textarea } from "@/components/ui/core";
 import type { PouchoscopyRecord } from "@/types/clinical";
 
 export function PouchoscopyForm({
@@ -17,12 +17,16 @@ export function PouchoscopyForm({
   editingRecord,
   onCancel,
   onSave,
+  onSaveAndContinue,
+  continueHint,
 }: {
   patientId: string;
   serialNumber: number;
   editingRecord?: PouchoscopyRecord | null;
   onCancel: () => void;
   onSave: (record: PouchoscopyRecord) => void;
+  onSaveAndContinue?: (record: PouchoscopyRecord) => void;
+  continueHint?: string | null;
 }) {
   const [form, setForm] = useState<PouchoscopyFormState>(() =>
     editingRecord
@@ -50,16 +54,16 @@ export function PouchoscopyForm({
     return Object.keys(next).length === 0;
   };
 
-  const submit = () => {
+  const submit = (andContinue = false) => {
     if (!validate()) return;
-    onSave(
-      pouchoscopyFormToRecord(
-        form,
-        patientId,
-        recordId,
-        slNo,
-      ),
+    const record = pouchoscopyFormToRecord(
+      form,
+      patientId,
+      recordId,
+      slNo,
     );
+    if (andContinue && onSaveAndContinue) onSaveAndContinue(record);
+    else onSave(record);
   };
 
   return (
@@ -132,15 +136,15 @@ export function PouchoscopyForm({
         </div>
       </div>
 
-      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white p-5">
-        <Button variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button onClick={submit}>
-          <Check className="size-4" />
-          Save record
-        </Button>
-      </div>
+      <FormSaveActions
+        onCancel={onCancel}
+        onSave={() => submit(false)}
+        onSaveAndContinue={
+          onSaveAndContinue ? () => submit(true) : undefined
+        }
+        saveLabel="Save record"
+        continueHint={continueHint}
+      />
     </div>
   );
 }

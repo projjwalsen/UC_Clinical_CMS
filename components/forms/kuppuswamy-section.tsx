@@ -61,6 +61,7 @@ export function KuppuswamySection({
   onOccupationChange,
   onIncomeChange,
   errors,
+  hideOccupation = false,
 }: {
   education: string;
   occupation: string;
@@ -73,6 +74,8 @@ export function KuppuswamySection({
     occupation?: string;
     monthlyFamilyIncome?: string;
   };
+  /** When occupation is captured elsewhere (e.g. Contact & demographics) */
+  hideOccupation?: boolean;
 }) {
   const result = calculateKuppuswamy(education, occupation, monthlyFamilyIncome);
   const complete =
@@ -91,7 +94,9 @@ export function KuppuswamySection({
         </p>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      <div
+        className={`grid gap-5 ${hideOccupation ? "" : "xl:grid-cols-2"}`}
+      >
         <ScoreTable
           title="Education of the head of the family"
           subtitle="Select the highest educational qualification"
@@ -100,14 +105,16 @@ export function KuppuswamySection({
           onChange={onEducationChange}
           error={errors.education}
         />
-        <ScoreTable
-          title="Occupation of the head of the family"
-          subtitle="Select the primary occupation type"
-          options={KUPPUSWAMY_OCCUPATION}
-          value={occupation}
-          onChange={onOccupationChange}
-          error={errors.occupation}
-        />
+        {!hideOccupation && (
+          <ScoreTable
+            title="Occupation of the head of the family"
+            subtitle="Select the primary occupation type"
+            options={KUPPUSWAMY_OCCUPATION}
+            value={occupation}
+            onChange={onOccupationChange}
+            error={errors.occupation}
+          />
+        )}
       </div>
 
       <ScoreTable

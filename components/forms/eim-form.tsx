@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check } from "lucide-react";
+import { FormSaveActions } from "@/components/forms/form-save-actions";
 import { EIM_MANIFESTATIONS, YES_NO } from "@/data/lookups";
 import {
   buildEimFormState,
@@ -18,12 +18,16 @@ export function EimForm({
   lastAssessment,
   onCancel,
   onSave,
+  onSaveAndContinue,
+  continueHint,
 }: {
   patientId: string;
   visits: Visit[];
   lastAssessment?: EIMRecord[] | null;
   onCancel: () => void;
   onSave: (records: EIMRecord[]) => void;
+  onSaveAndContinue?: (records: EIMRecord[]) => void;
+  continueHint?: string | null;
 }) {
   const defaultVisitId = visits[0]?.id ?? "";
   const [form, setForm] = useState<EimFormState>(() =>
@@ -59,9 +63,11 @@ export function EimForm({
     return Object.keys(next).length === 0;
   };
 
-  const submit = () => {
+  const submit = (andContinue = false) => {
     if (!validate()) return;
-    onSave(eimFormToRecords(form, patientId, assessmentId));
+    const records = eimFormToRecords(form, patientId, assessmentId);
+    if (andContinue && onSaveAndContinue) onSaveAndContinue(records);
+    else onSave(records);
   };
 
   const presentCount = EIM_MANIFESTATIONS.filter(
@@ -230,15 +236,15 @@ export function EimForm({
         </div>
       </div>
 
-      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white p-5">
-        <Button variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button onClick={submit}>
-          <Check className="size-4" />
-          Save assessment
-        </Button>
-      </div>
+      <FormSaveActions
+        onCancel={onCancel}
+        onSave={() => submit(false)}
+        onSaveAndContinue={
+          onSaveAndContinue ? () => submit(true) : undefined
+        }
+        saveLabel="Save assessment"
+        continueHint={continueHint}
+      />
     </div>
   );
 }

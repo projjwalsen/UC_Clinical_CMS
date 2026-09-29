@@ -33,6 +33,7 @@ import {
   StatisticalReports,
 } from "@/components/reports/reports";
 import { SettingsPage } from "@/components/settings/settings";
+import type { ClinicalRecords } from "@/types/clinical";
 
 const nav = [
   ["dashboard", "Dashboard", LayoutDashboard],
@@ -72,6 +73,9 @@ export function AppShell({
   const [search, setSearch] = useState("");
   const [profileMenu, setProfileMenu] = useState(false);
   const [notifications, setNotifications] = useState(false);
+  const [profileOpenDrawer, setProfileOpenDrawer] = useState<
+    keyof ClinicalRecords | null
+  >(null);
   useEffect(() => {
     if (initialPage) setPage(initialPage);
     if (initialPatientId) setPatientId(initialPatientId);
@@ -316,12 +320,19 @@ export function AppShell({
             <PatientForm
               onCancel={() => navigate("patients")}
               onSaved={patient}
+              onSavedAndContinue={(id) => {
+                setPatientId(id);
+                setProfileOpenDrawer("visits");
+                navigate("profile");
+              }}
             />
           )}
           {page === "profile" && (
             <PatientProfile
               patientId={patientId || patients[0]?.id}
               onBack={() => navigate("patients")}
+              initialOpenDrawer={profileOpenDrawer}
+              onInitialOpenDrawerConsumed={() => setProfileOpenDrawer(null)}
             />
           )}
           {page === "clinical-records" && (

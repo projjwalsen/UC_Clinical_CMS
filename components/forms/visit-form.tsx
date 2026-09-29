@@ -68,6 +68,8 @@ export function VisitForm({
   lastVisit,
   onCancel,
   onSave,
+  onSaveAndContinue,
+  continueHint,
 }: {
   patientId: string;
   visitCount: number;
@@ -76,6 +78,8 @@ export function VisitForm({
   lastVisit?: Visit | null;
   onCancel: () => void;
   onSave: (visit: Visit) => void;
+  onSaveAndContinue?: (visit: Visit) => void;
+  continueHint?: string | null;
 }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<VisitFormState>(() =>
@@ -204,9 +208,11 @@ export function VisitForm({
     if (validateStep()) setStep((s) => Math.min(steps.length - 1, s + 1));
   };
 
-  const submit = () => {
+  const submit = (andContinue = false) => {
     if (!validateForSave()) return;
-    onSave(visitFormToRecord(form, visitId, patientId));
+    const record = visitFormToRecord(form, visitId, patientId);
+    if (andContinue && onSaveAndContinue) onSaveAndContinue(record);
+    else onSave(record);
   };
 
   return (
@@ -442,10 +448,19 @@ export function VisitForm({
               <ChevronRight className="size-4" />
             </Button>
           ) : (
-            <Button onClick={submit}>
-              <Check className="size-4" />
-              Save visit
-            </Button>
+            <>
+              <Button onClick={() => submit(false)}>
+                <Check className="size-4" />
+                Save visit
+              </Button>
+              {onSaveAndContinue && (
+                <Button variant="secondary" onClick={() => submit(true)}>
+                  Save and continue
+                  {continueHint ? ` to ${continueHint}` : ""}
+                  <ChevronRight className="size-4" />
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>

@@ -18,6 +18,7 @@ export type PatientPersonalFormState = {
   religion: string;
   maritalStatus: string;
   children: string;
+  occupationText: string;
   occupation: string;
   education: string;
   monthlyFamilyIncome: string;
@@ -62,6 +63,7 @@ export function patientToPersonalForm(patient: Patient): PatientPersonalFormStat
     religion: patient.religion,
     maritalStatus: patient.maritalStatus,
     children: String(patient.children),
+    occupationText: patient.occupationText ?? "",
     occupation: patient.occupation,
     education: patient.education,
     monthlyFamilyIncome: patient.monthlyFamilyIncome ?? "",
@@ -119,6 +121,7 @@ export function applyPersonalFormToPatient(
     religion: form.religion,
     maritalStatus: form.maritalStatus,
     children: Number(form.children) || 0,
+    occupationText: form.occupationText.trim() || undefined,
     occupation: form.occupation,
     education: form.education,
     monthlyFamilyIncome: form.monthlyFamilyIncome,

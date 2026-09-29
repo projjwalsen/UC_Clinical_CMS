@@ -236,6 +236,13 @@ export function PatientEditForm({
                 ))}
               </Select>
             </Field>
+            <Field label="Occupation">
+              <Input
+                value={form.occupationText}
+                onChange={(e) => set("occupationText", e.target.value)}
+                placeholder="e.g. School teacher, software engineer"
+              />
+            </Field>
           </div>
         </section>
 

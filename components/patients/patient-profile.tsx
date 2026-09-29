@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CalendarPlus,
@@ -97,6 +97,11 @@ import {
   labAbnormalFlag,
   labNumericValue,
 } from "@/lib/lab-utils";
+import {
+  getClinicalSectionLabel,
+  getContinueSectionLabel,
+  getNextClinicalSection,
+} from "@/lib/clinical-workflow";
 
 const tabsBeforeReproductive: [string, keyof ClinicalRecords | "overview"][] = [
   ["Overview", "overview"],
@@ -139,10 +144,14 @@ export function PatientProfile({
   patientId,
   onBack,
   initialTab,
+  initialOpenDrawer,
+  onInitialOpenDrawerConsumed,
 }: {
   patientId: string;
   onBack: () => void;
   initialTab?: "clinical-dataset";
+  initialOpenDrawer?: keyof ClinicalRecords | null;
+  onInitialOpenDrawerConsumed?: () => void;
 }) {
   const {
     patients,
@@ -167,6 +176,31 @@ export function PatientProfile({
   const closeDrawer = () => {
     setDrawer(null);
     setDrawerPrefill(null);
+  };
+
+  useEffect(() => {
+    if (!initialOpenDrawer) return;
+    setTab(initialOpenDrawer);
+    setDrawerPrefill(null);
+    setDrawer(initialOpenDrawer);
+    onInitialOpenDrawerConsumed?.();
+  }, [initialOpenDrawer, patientId, onInitialOpenDrawerConsumed]);
+
+  const finishSectionSave = (
+    kind: keyof ClinicalRecords,
+    andContinue: boolean,
+  ) => {
+    if (andContinue) {
+      const next = getNextClinicalSection(kind);
+      if (next) {
+        setDrawerPrefill(null);
+        setTab(next);
+        setDrawer(next);
+        toast.message(`Continue with ${getClinicalSectionLabel(next)}`);
+        return;
+      }
+    }
+    closeDrawer();
   };
 
   const openAddDrawer = (kind: keyof ClinicalRecords) => {
@@ -263,7 +297,7 @@ export function PatientProfile({
     tab === "overview" || tab === "clinical-dataset"
       ? []
       : (related[tab] as unknown as Record<string, unknown>[]);
-  const saveRecord = () => {
+  const saveRecord = (andContinue = false) => {
     if (
       !drawer ||
       drawer === "visits" ||
@@ -303,8 +337,8 @@ export function PatientProfile({
                     value: record.value,
                   };
     addRecord(drawer, { ...base, ...extras } as never);
-    closeDrawer();
     toast.success("Clinical record added to local demo data");
+    finishSectionSave(drawer, andContinue);
   };
 
   const upsertVisitContextBatch = <T extends { date: string; visitId?: string }>(
@@ -321,101 +355,113 @@ export function PatientProfile({
     addRecords(kind, batch as never);
   };
 
-  const saveVisit = (visit: Visit) => {
+  const saveVisit = (visit: Visit, andContinue = false) => {
     const exists = records.visits.some((v) => v.id === visit.id);
     if (exists) updateRecord("visits", visit);
     else addRecord("visits", visit);
-    closeDrawer();
     toast.success(exists ? "Visit updated" : "Visit added");
+    finishSectionSave("visits", andContinue);
   };
-  const saveSymptoms = (symptomRecords: SymptomRecord[]) => {
+  const saveSymptoms = (symptomRecords: SymptomRecord[], andContinue = false) => {
     upsertVisitContextBatch("symptoms", symptomRecords);
-    closeDrawer();
     toast.success("Symptom assessment saved");
+    finishSectionSave("symptoms", andContinue);
   };
-  const saveEims = (eimRecords: EIMRecord[]) => {
+  const saveEims = (eimRecords: EIMRecord[], andContinue = false) => {
     upsertVisitContextBatch("eims", eimRecords);
-    closeDrawer();
     toast.success("EIM assessment saved");
+    finishSectionSave("eims", andContinue);
   };
-  const saveLabs = (labRecords: LaboratoryResult[]) => {
+  const saveLabs = (labRecords: LaboratoryResult[], andContinue = false) => {
     upsertVisitContextBatch("labs", labRecords);
-    closeDrawer();
     toast.success("Lab results saved");
+    finishSectionSave("labs", andContinue);
   };
-  const saveEndoscopy = (endoscopyRecord: EndoscopyRecord) => {
+  const saveEndoscopy = (endoscopyRecord: EndoscopyRecord, andContinue = false) => {
     const exists = records.endoscopies.some((r) => r.id === endoscopyRecord.id);
     if (exists) updateRecord("endoscopies", endoscopyRecord);
     else addRecord("endoscopies", endoscopyRecord);
-    closeDrawer();
     toast.success(exists ? "Colonoscopy updated" : "Colonoscopy record saved");
+    finishSectionSave("endoscopies", andContinue);
   };
-  const saveHistopathology = (histopathologyRecords: HistopathologyRecord[]) => {
+  const saveHistopathology = (
+    histopathologyRecords: HistopathologyRecord[],
+    andContinue = false,
+  ) => {
     upsertVisitContextBatch("histopathology", histopathologyRecords);
-    closeDrawer();
     toast.success("Histopathology records saved");
+    finishSectionSave("histopathology", andContinue);
   };
-  const saveImaging = (imagingRecord: ImagingRecord) => {
+  const saveImaging = (imagingRecord: ImagingRecord, andContinue = false) => {
     const exists = records.imaging.some((r) => r.id === imagingRecord.id);
     if (exists) updateRecord("imaging", imagingRecord);
     else addRecord("imaging", imagingRecord);
-    closeDrawer();
     toast.success(exists ? "Imaging updated" : "Imaging record saved");
+    finishSectionSave("imaging", andContinue);
   };
-  const saveMedications = (medicationRecords: MedicationRecord[]) => {
+  const saveMedications = (
+    medicationRecords: MedicationRecord[],
+    andContinue = false,
+  ) => {
     if (!medicationRecords.length) return;
     const visitId = medicationRecords[0].visitId;
     related.medications
       .filter((m) => m.patientId === patientId && m.visitId === visitId)
       .forEach((m) => deleteRecord("medications", m.id));
     addRecords("medications", medicationRecords);
-    closeDrawer();
     toast.success("Medication records saved");
+    finishSectionSave("medications", andContinue);
   };
-  const savePregnancy = (pregnancyRecords: PregnancyRecord[]) => {
+  const savePregnancy = (
+    pregnancyRecords: PregnancyRecord[],
+    andContinue = false,
+  ) => {
     pregnancyRecords.forEach((record) => {
       const exists = records.pregnancies.some((r) => r.id === record.id);
       if (exists) updateRecord("pregnancies", record);
       else addRecord("pregnancies", record);
     });
-    closeDrawer();
     toast.success(
       pregnancyRecords.length === 1
         ? "Pregnancy record saved"
         : "Pregnancy records saved",
     );
+    finishSectionSave("pregnancies", andContinue);
   };
-  const saveOffspring = (offspringRecord: OffspringRecord) => {
+  const saveOffspring = (offspringRecord: OffspringRecord, andContinue = false) => {
     const exists = records.offspring.some((r) => r.id === offspringRecord.id);
     if (exists) updateRecord("offspring", offspringRecord);
     else addRecord("offspring", offspringRecord);
-    closeDrawer();
     toast.success(exists ? "Offspring updated" : "Offspring record saved");
+    finishSectionSave("offspring", andContinue);
   };
-  const saveRelapse = (relapseRecord: RelapseRecord) => {
+  const saveRelapse = (relapseRecord: RelapseRecord, andContinue = false) => {
     const exists = records.relapses.some((r) => r.id === relapseRecord.id);
     if (exists) updateRecord("relapses", relapseRecord);
     else addRecord("relapses", relapseRecord);
-    closeDrawer();
     toast.success(exists ? "Relapse updated" : "Relapse record saved");
+    finishSectionSave("relapses", andContinue);
   };
-  const saveIpaa = (ipaaRecord: IPAARecord) => {
+  const saveIpaa = (ipaaRecord: IPAARecord, andContinue = false) => {
     const exists = records.ipaa.some((r) => r.id === ipaaRecord.id);
     if (exists) updateRecord("ipaa", ipaaRecord);
     else addRecord("ipaa", ipaaRecord);
-    closeDrawer();
     toast.success(exists ? "IPAA updated" : "IPAA follow-up saved");
+    finishSectionSave("ipaa", andContinue);
   };
-  const savePouchoscopy = (pouchoscopyRecord: PouchoscopyRecord) => {
+  const savePouchoscopy = (
+    pouchoscopyRecord: PouchoscopyRecord,
+    andContinue = false,
+  ) => {
     const exists = records.pouchoscopies.some(
       (r) => r.id === pouchoscopyRecord.id,
     );
     if (exists) updateRecord("pouchoscopies", pouchoscopyRecord);
     else addRecord("pouchoscopies", pouchoscopyRecord);
-    closeDrawer();
     toast.success(
       exists ? "Histology pouchoscopy updated" : "Pouchoscopy record saved",
     );
+    finishSectionSave("pouchoscopies", andContinue);
   };
 
   const handleDeleteRecord = (
@@ -675,7 +721,12 @@ export function PatientProfile({
                       "Location",
                       `${patient.city}, ${patient.state}${patient.country ? `, ${patient.country}` : ""}`,
                     ],
-                    ["Occupation", patient.occupation],
+                    [
+                      "Occupation",
+                      patient.occupationText?.trim() ||
+                        patient.occupation ||
+                        "Not recorded",
+                    ],
                     ["Education", patient.education],
                     ["Monthly income", patient.monthlyFamilyIncome || "Not recorded"],
                     [
@@ -1557,7 +1608,9 @@ export function PatientProfile({
                   editingVisit={drawerPrefill?.visit ?? null}
                   lastVisit={lastVisit}
                   onCancel={closeDrawer}
-                  onSave={saveVisit}
+                  onSave={(v) => saveVisit(v, false)}
+                  onSaveAndContinue={(v) => saveVisit(v, true)}
+                  continueHint={getContinueSectionLabel("visits")}
                 />
               </>
             ) : drawer === "symptoms" ? (
@@ -1584,7 +1637,9 @@ export function PatientProfile({
                   initialAssessment={drawerPrefill?.symptomRecords ?? null}
                   lastAssessment={lastSymptomAssessment}
                   onCancel={closeDrawer}
-                  onSave={saveSymptoms}
+                  onSave={(r) => saveSymptoms(r, false)}
+                  onSaveAndContinue={(r) => saveSymptoms(r, true)}
+                  continueHint={getContinueSectionLabel("symptoms")}
                 />
               </>
             ) : drawer === "eims" ? (
@@ -1609,7 +1664,9 @@ export function PatientProfile({
                   visits={related.visits as Visit[]}
                   lastAssessment={lastEimAssessment}
                   onCancel={() => closeDrawer()}
-                  onSave={saveEims}
+                  onSave={(r) => saveEims(r, false)}
+                  onSaveAndContinue={(r) => saveEims(r, true)}
+                  continueHint={getContinueSectionLabel("eims")}
                 />
               </>
             ) : drawer === "labs" ? (
@@ -1633,7 +1690,9 @@ export function PatientProfile({
                   patientId={patientId}
                   visits={related.visits as Visit[]}
                   onCancel={() => closeDrawer()}
-                  onSave={saveLabs}
+                  onSave={(r) => saveLabs(r, false)}
+                  onSaveAndContinue={(r) => saveLabs(r, true)}
+                  continueHint={getContinueSectionLabel("labs")}
                 />
               </>
             ) : drawer === "endoscopies" ? (
@@ -1660,7 +1719,9 @@ export function PatientProfile({
                   editingRecord={drawerPrefill?.endoscopy ?? null}
                   lastEndoscopy={lastEndoscopy}
                   onCancel={closeDrawer}
-                  onSave={saveEndoscopy}
+                  onSave={(r) => saveEndoscopy(r, false)}
+                  onSaveAndContinue={(r) => saveEndoscopy(r, true)}
+                  continueHint={getContinueSectionLabel("endoscopies")}
                 />
               </>
             ) : drawer === "histopathology" ? (
@@ -1685,7 +1746,9 @@ export function PatientProfile({
                   visits={related.visits as Visit[]}
                   initialRecords={drawerPrefill?.histopathology ?? null}
                   onCancel={closeDrawer}
-                  onSave={saveHistopathology}
+                  onSave={(r) => saveHistopathology(r, false)}
+                  onSaveAndContinue={(r) => saveHistopathology(r, true)}
+                  continueHint={getContinueSectionLabel("histopathology")}
                 />
               </>
             ) : drawer === "imaging" ? (
@@ -1709,7 +1772,9 @@ export function PatientProfile({
                   patientId={patientId}
                   visits={related.visits as Visit[]}
                   onCancel={() => closeDrawer()}
-                  onSave={saveImaging}
+                  onSave={(r) => saveImaging(r, false)}
+                  onSaveAndContinue={(r) => saveImaging(r, true)}
+                  continueHint={getContinueSectionLabel("imaging")}
                 />
               </>
             ) : drawer === "medications" ? (
@@ -1733,7 +1798,9 @@ export function PatientProfile({
                   patientId={patientId}
                   visits={related.visits as Visit[]}
                   onCancel={() => closeDrawer()}
-                  onSave={saveMedications}
+                  onSave={(r) => saveMedications(r, false)}
+                  onSaveAndContinue={(r) => saveMedications(r, true)}
+                  continueHint={getContinueSectionLabel("medications")}
                 />
               </>
             ) : drawer === "pregnancies" && isFemalePatient ? (
@@ -1757,7 +1824,9 @@ export function PatientProfile({
                   patientId={patientId}
                   existingRecords={related.pregnancies as PregnancyRecord[]}
                   onCancel={() => closeDrawer()}
-                  onSave={savePregnancy}
+                  onSave={(r) => savePregnancy(r, false)}
+                  onSaveAndContinue={(r) => savePregnancy(r, true)}
+                  continueHint={getContinueSectionLabel("pregnancies")}
                 />
               </>
             ) : drawer === "offspring" ? (
@@ -1781,7 +1850,9 @@ export function PatientProfile({
                   patientId={patientId}
                   lastRecord={lastOffspring}
                   onCancel={() => closeDrawer()}
-                  onSave={saveOffspring}
+                  onSave={(r) => saveOffspring(r, false)}
+                  onSaveAndContinue={(r) => saveOffspring(r, true)}
+                  continueHint={getContinueSectionLabel("offspring")}
                 />
               </>
             ) : drawer === "relapses" ? (
@@ -1806,7 +1877,9 @@ export function PatientProfile({
                   visits={related.visits as Visit[]}
                   editingRecord={drawerPrefill?.relapse ?? null}
                   onCancel={closeDrawer}
-                  onSave={saveRelapse}
+                  onSave={(r) => saveRelapse(r, false)}
+                  onSaveAndContinue={(r) => saveRelapse(r, true)}
+                  continueHint={getContinueSectionLabel("relapses")}
                 />
               </>
             ) : drawer === "ipaa" ? (
@@ -1830,7 +1903,9 @@ export function PatientProfile({
                   patientId={patientId}
                   visits={related.visits as Visit[]}
                   onCancel={() => closeDrawer()}
-                  onSave={saveIpaa}
+                  onSave={(r) => saveIpaa(r, false)}
+                  onSaveAndContinue={(r) => saveIpaa(r, true)}
+                  continueHint={getContinueSectionLabel("ipaa")}
                 />
               </>
             ) : drawer === "pouchoscopies" ? (
@@ -1855,7 +1930,9 @@ export function PatientProfile({
                   serialNumber={nextPouchoscopySl}
                   editingRecord={drawerPrefill?.pouchoscopy ?? null}
                   onCancel={closeDrawer}
-                  onSave={savePouchoscopy}
+                  onSave={(r) => savePouchoscopy(r, false)}
+                  onSaveAndContinue={(r) => savePouchoscopy(r, true)}
+                  continueHint={getContinueSectionLabel("pouchoscopies")}
                 />
               </>
             ) : (
@@ -1950,11 +2027,18 @@ export function PatientProfile({
                 Mark as reviewed during this visit
               </label>
             </div>
-            <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white p-5">
+            <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white p-5">
               <Button variant="secondary" onClick={() => closeDrawer()}>
                 Cancel
               </Button>
-              <Button onClick={saveRecord}>Save record</Button>
+              <Button onClick={() => saveRecord(false)}>Save record</Button>
+              {drawer === "surgeries" &&
+                getContinueSectionLabel("surgeries") && (
+                  <Button variant="secondary" onClick={() => saveRecord(true)}>
+                    Save and continue to{" "}
+                    {getContinueSectionLabel("surgeries")}
+                  </Button>
+                )}
             </div>
               </>
             )}

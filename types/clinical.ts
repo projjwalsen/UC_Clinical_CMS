@@ -30,6 +30,9 @@ export interface Patient {
   religion: string;
   maritalStatus: string;
   children: number;
+  /** Free-text job / role (Contact & demographics) */
+  occupationText?: string;
+  /** Kuppuswamy occupation category (head of family) */
   occupation: string;
   education: string;
   diet: string;

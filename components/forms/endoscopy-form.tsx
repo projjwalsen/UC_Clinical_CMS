@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { VisitLinkedDataBanner } from "@/components/forms/visit-linked-data-banner";
 import { useSyncRecordsOnVisitContext } from "@/hooks/use-sync-records-on-visit-context";
-import { Check } from "lucide-react";
+import { FormSaveActions } from "@/components/forms/form-save-actions";
 import { UceisScoreSection } from "@/components/forms/uceis-score-section";
 import { DISEASE_EXTENT } from "@/data/lookups";
 import {
@@ -24,6 +24,8 @@ export function EndoscopyForm({
   lastEndoscopy,
   onCancel,
   onSave,
+  onSaveAndContinue,
+  continueHint,
 }: {
   patientId: string;
   visits: Visit[];
@@ -32,6 +34,8 @@ export function EndoscopyForm({
   lastEndoscopy?: EndoscopyRecord | null;
   onCancel: () => void;
   onSave: (record: EndoscopyRecord) => void;
+  onSaveAndContinue?: (record: EndoscopyRecord) => void;
+  continueHint?: string | null;
 }) {
   const defaultVisitId = visits[0]?.id ?? "";
   const [form, setForm] = useState<EndoscopyFormState>(() =>
@@ -90,9 +94,11 @@ export function EndoscopyForm({
     return Object.keys(next).length === 0;
   };
 
-  const submit = () => {
+  const submit = (andContinue = false) => {
     if (!validate()) return;
-    onSave(endoscopyFormToRecord(form, patientId, recordId));
+    const record = endoscopyFormToRecord(form, patientId, recordId);
+    if (andContinue && onSaveAndContinue) onSaveAndContinue(record);
+    else onSave(record);
   };
 
   return (
@@ -201,15 +207,15 @@ export function EndoscopyForm({
         </div>
       </div>
 
-      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white p-5">
-        <Button variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button onClick={submit}>
-          <Check className="size-4" />
-          Save colonoscopy
-        </Button>
-      </div>
+      <FormSaveActions
+        onCancel={onCancel}
+        onSave={() => submit(false)}
+        onSaveAndContinue={
+          onSaveAndContinue ? () => submit(true) : undefined
+        }
+        saveLabel="Save colonoscopy"
+        continueHint={continueHint}
+      />
     </div>
   );
 }

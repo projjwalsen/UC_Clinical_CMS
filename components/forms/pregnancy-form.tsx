@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
+import { FormSaveActions } from "@/components/forms/form-save-actions";
 import {
   DISEASE_ACTIVITY,
   PREGNANCY_COURSE,
@@ -302,11 +303,15 @@ export function PregnancyForm({
   existingRecords,
   onCancel,
   onSave,
+  onSaveAndContinue,
+  continueHint,
 }: {
   patientId: string;
   existingRecords: PregnancyRecord[];
   onCancel: () => void;
   onSave: (records: PregnancyRecord[]) => void;
+  onSaveAndContinue?: (records: PregnancyRecord[]) => void;
+  continueHint?: string | null;
 }) {
   const startNumber = useMemo(
     () => suggestNextPregnancyNumber(existingRecords),
@@ -368,9 +373,11 @@ export function PregnancyForm({
     return Object.keys(next).length === 0;
   };
 
-  const submit = () => {
+  const submit = (andContinue = false) => {
     if (!validate()) return;
-    onSave(pregnancyFormToRecords(form, patientId, batchId));
+    const records = pregnancyFormToRecords(form, patientId, batchId);
+    if (andContinue && onSaveAndContinue) onSaveAndContinue(records);
+    else onSave(records);
   };
 
   return (
@@ -457,15 +464,15 @@ export function PregnancyForm({
         </div>
       </div>
 
-      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white p-5">
-        <Button variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button onClick={submit}>
-          <Check className="size-4" />
-          Save pregnancies
-        </Button>
-      </div>
+      <FormSaveActions
+        onCancel={onCancel}
+        onSave={() => submit(false)}
+        onSaveAndContinue={
+          onSaveAndContinue ? () => submit(true) : undefined
+        }
+        saveLabel="Save pregnancies"
+        continueHint={continueHint}
+      />
     </div>
   );
 }

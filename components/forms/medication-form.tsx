@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Check, Plus, Trash2 } from "lucide-react";
+import { FormSaveActions } from "@/components/forms/form-save-actions";
 import { MEDICATION_ROUTES, MEDICATION_STATUS } from "@/data/lookups";
 import {
   buildMedicationFormState,
@@ -18,11 +19,15 @@ export function MedicationForm({
   visits,
   onCancel,
   onSave,
+  onSaveAndContinue,
+  continueHint,
 }: {
   patientId: string;
   visits: Visit[];
   onCancel: () => void;
   onSave: (records: MedicationRecord[]) => void;
+  onSaveAndContinue?: (records: MedicationRecord[]) => void;
+  continueHint?: string | null;
 }) {
   const defaultVisitId = visits[0]?.id ?? "";
   const [form, setForm] = useState<MedicationFormState>(() =>
@@ -74,9 +79,11 @@ export function MedicationForm({
     return Object.keys(next).length === 0;
   };
 
-  const submit = () => {
+  const submit = (andContinue = false) => {
     if (!validate()) return;
-    onSave(medicationFormToRecords(form, patientId, batchId));
+    const records = medicationFormToRecords(form, patientId, batchId);
+    if (andContinue && onSaveAndContinue) onSaveAndContinue(records);
+    else onSave(records);
   };
 
   return (
@@ -256,15 +263,15 @@ export function MedicationForm({
         </div>
       </div>
 
-      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white p-5">
-        <Button variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button onClick={submit}>
-          <Check className="size-4" />
-          Save medications
-        </Button>
-      </div>
+      <FormSaveActions
+        onCancel={onCancel}
+        onSave={() => submit(false)}
+        onSaveAndContinue={
+          onSaveAndContinue ? () => submit(true) : undefined
+        }
+        saveLabel="Save medications"
+        continueHint={continueHint}
+      />
     </div>
   );
 }

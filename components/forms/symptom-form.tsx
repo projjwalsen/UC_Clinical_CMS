@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { VisitLinkedDataBanner } from "@/components/forms/visit-linked-data-banner";
 import { useSyncRecordsOnVisitContext } from "@/hooks/use-sync-records-on-visit-context";
-import { Check } from "lucide-react";
+import { FormSaveActions } from "@/components/forms/form-save-actions";
 import { SYMPTOMS, YES_NO } from "@/data/lookups";
 import {
   buildSymptomFormState,
@@ -22,6 +22,8 @@ export function SymptomForm({
   lastAssessment,
   onCancel,
   onSave,
+  onSaveAndContinue,
+  continueHint,
 }: {
   patientId: string;
   visits: Visit[];
@@ -30,6 +32,8 @@ export function SymptomForm({
   lastAssessment?: SymptomRecord[] | null;
   onCancel: () => void;
   onSave: (records: SymptomRecord[]) => void;
+  onSaveAndContinue?: (records: SymptomRecord[]) => void;
+  continueHint?: string | null;
 }) {
   const defaultVisitId = visits[0]?.id ?? "";
   const seedAssessment = initialAssessment ?? lastAssessment ?? null;
@@ -95,16 +99,16 @@ export function SymptomForm({
     return Object.keys(next).length === 0;
   };
 
-  const submit = () => {
+  const submit = (andContinue = false) => {
     if (!validate()) return;
-    onSave(
-      symptomFormToRecords(
-        form,
-        patientId,
-        assessmentId,
-        existingIdsBySymptom,
-      ),
+    const records = symptomFormToRecords(
+      form,
+      patientId,
+      assessmentId,
+      existingIdsBySymptom,
     );
+    if (andContinue && onSaveAndContinue) onSaveAndContinue(records);
+    else onSave(records);
   };
 
   const presentCount = SYMPTOMS.filter(
@@ -276,15 +280,15 @@ export function SymptomForm({
         </div>
       </div>
 
-      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white p-5">
-        <Button variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button onClick={submit}>
-          <Check className="size-4" />
-          Save assessment
-        </Button>
-      </div>
+      <FormSaveActions
+        onCancel={onCancel}
+        onSave={() => submit(false)}
+        onSaveAndContinue={
+          onSaveAndContinue ? () => submit(true) : undefined
+        }
+        saveLabel="Save assessment"
+        continueHint={continueHint}
+      />
     </div>
   );
 }

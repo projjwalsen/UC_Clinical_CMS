@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { FormSaveActions } from "@/components/forms/form-save-actions";
 import { YES_NO } from "@/data/lookups";
 import {
   buildOffspringFormState,
@@ -18,11 +18,15 @@ export function OffspringForm({
   lastRecord,
   onCancel,
   onSave,
+  onSaveAndContinue,
+  continueHint,
 }: {
   patientId: string;
   lastRecord?: OffspringRecord | null;
   onCancel: () => void;
   onSave: (record: OffspringRecord) => void;
+  onSaveAndContinue?: (record: OffspringRecord) => void;
+  continueHint?: string | null;
 }) {
   const [form, setForm] = useState<OffspringFormState>(() =>
     buildOffspringFormState(lastRecord),
@@ -58,15 +62,15 @@ export function OffspringForm({
     return Object.keys(next).length === 0;
   };
 
-  const submit = () => {
+  const submit = (andContinue = false) => {
     if (!validate()) return;
-    onSave(
-      offspringFormToRecord(
-        form,
-        patientId,
-        `OFF-${patientId}-${Date.now()}`,
-      ),
+    const record = offspringFormToRecord(
+      form,
+      patientId,
+      `OFF-${patientId}-${Date.now()}`,
     );
+    if (andContinue && onSaveAndContinue) onSaveAndContinue(record);
+    else onSave(record);
   };
 
   const showInfertilityPeriod = form.anyInfertility === "Yes";
@@ -150,15 +154,15 @@ export function OffspringForm({
         </div>
       </div>
 
-      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white p-5">
-        <Button variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button onClick={submit}>
-          <Check className="size-4" />
-          Save offspring
-        </Button>
-      </div>
+      <FormSaveActions
+        onCancel={onCancel}
+        onSave={() => submit(false)}
+        onSaveAndContinue={
+          onSaveAndContinue ? () => submit(true) : undefined
+        }
+        saveLabel="Save offspring"
+        continueHint={continueHint}
+      />
     </div>
   );
 }

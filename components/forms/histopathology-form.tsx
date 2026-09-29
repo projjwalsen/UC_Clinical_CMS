@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Check, Plus, Trash2 } from "lucide-react";
+import { FormSaveActions } from "@/components/forms/form-save-actions";
 import {
   HISTOLOGY_SECTIONS,
   parametersForSection,
@@ -46,12 +47,16 @@ export function HistopathologyForm({
   initialRecords,
   onCancel,
   onSave,
+  onSaveAndContinue,
+  continueHint,
 }: {
   patientId: string;
   visits: Visit[];
   initialRecords?: HistopathologyRecord[] | null;
   onCancel: () => void;
   onSave: (records: HistopathologyRecord[]) => void;
+  onSaveAndContinue?: (records: HistopathologyRecord[]) => void;
+  continueHint?: string | null;
 }) {
   const defaultVisitId = visits[0]?.id ?? "";
   const [form, setForm] = useState<HistopathologyFormState>(() =>
@@ -130,9 +135,11 @@ export function HistopathologyForm({
     return Object.keys(next).length === 0;
   };
 
-  const submit = () => {
+  const submit = (andContinue = false) => {
     if (!validate()) return;
-    onSave(histopathologyFormToRecords(form, patientId, batchId));
+    const records = histopathologyFormToRecords(form, patientId, batchId);
+    if (andContinue && onSaveAndContinue) onSaveAndContinue(records);
+    else onSave(records);
   };
 
   return (
@@ -306,15 +313,15 @@ export function HistopathologyForm({
         </div>
       </div>
 
-      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white p-5">
-        <Button variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button onClick={submit}>
-          <Check className="size-4" />
-          Save histopathology
-        </Button>
-      </div>
+      <FormSaveActions
+        onCancel={onCancel}
+        onSave={() => submit(false)}
+        onSaveAndContinue={
+          onSaveAndContinue ? () => submit(true) : undefined
+        }
+        saveLabel="Save histopathology"
+        continueHint={continueHint}
+      />
     </div>
   );
 }

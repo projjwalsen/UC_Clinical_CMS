@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { FormSaveActions } from "@/components/forms/form-save-actions";
 import {
   buildImagingFormState,
   imagingFormToRecord,
   type ImagingFormState,
 } from "@/lib/imaging-utils";
-import { Button, Field, Input, Select, Textarea } from "@/components/ui/core";
+import { Field, Input, Select, Textarea } from "@/components/ui/core";
 import type { ImagingRecord, Visit } from "@/types/clinical";
 
 export function ImagingForm({
@@ -15,11 +15,15 @@ export function ImagingForm({
   visits,
   onCancel,
   onSave,
+  onSaveAndContinue,
+  continueHint,
 }: {
   patientId: string;
   visits: Visit[];
   onCancel: () => void;
   onSave: (record: ImagingRecord) => void;
+  onSaveAndContinue?: (record: ImagingRecord) => void;
+  continueHint?: string | null;
 }) {
   const defaultVisitId = visits[0]?.id ?? "";
   const [form, setForm] = useState<ImagingFormState>(() =>
@@ -45,11 +49,15 @@ export function ImagingForm({
     return Object.keys(next).length === 0;
   };
 
-  const submit = () => {
+  const submit = (andContinue = false) => {
     if (!validate()) return;
-    onSave(
-      imagingFormToRecord(form, patientId, `IMG-${patientId}-${Date.now()}`),
+    const record = imagingFormToRecord(
+      form,
+      patientId,
+      `IMG-${patientId}-${Date.now()}`,
     );
+    if (andContinue && onSaveAndContinue) onSaveAndContinue(record);
+    else onSave(record);
   };
 
   return (
@@ -121,15 +129,15 @@ export function ImagingForm({
         </div>
       </div>
 
-      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white p-5">
-        <Button variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button onClick={submit}>
-          <Check className="size-4" />
-          Save imaging
-        </Button>
-      </div>
+      <FormSaveActions
+        onCancel={onCancel}
+        onSave={() => submit(false)}
+        onSaveAndContinue={
+          onSaveAndContinue ? () => submit(true) : undefined
+        }
+        saveLabel="Save imaging"
+        continueHint={continueHint}
+      />
     </div>
   );
 }

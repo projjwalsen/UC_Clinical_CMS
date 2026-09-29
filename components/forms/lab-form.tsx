@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Check, Plus, Trash2 } from "lucide-react";
+import { FormSaveActions } from "@/components/forms/form-save-actions";
 import {
   ABNORMAL_FLAGS,
   LAB_CATEGORIES,
@@ -65,11 +66,15 @@ export function LabForm({
   visits,
   onCancel,
   onSave,
+  onSaveAndContinue,
+  continueHint,
 }: {
   patientId: string;
   visits: Visit[];
   onCancel: () => void;
   onSave: (records: LaboratoryResult[]) => void;
+  onSaveAndContinue?: (records: LaboratoryResult[]) => void;
+  continueHint?: string | null;
 }) {
   const defaultVisitId = visits[0]?.id ?? "";
   const [form, setForm] = useState<LabFormState>(() =>
@@ -119,9 +124,11 @@ export function LabForm({
     return Object.keys(next).length === 0;
   };
 
-  const submit = () => {
+  const submit = (andContinue = false) => {
     if (!validate()) return;
-    onSave(labFormToRecords(form, patientId, batchId));
+    const records = labFormToRecords(form, patientId, batchId);
+    if (andContinue && onSaveAndContinue) onSaveAndContinue(records);
+    else onSave(records);
   };
 
   return (
@@ -322,15 +329,15 @@ export function LabForm({
         </div>
       </div>
 
-      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-200 bg-white p-5">
-        <Button variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button onClick={submit}>
-          <Check className="size-4" />
-          Save lab results
-        </Button>
-      </div>
+      <FormSaveActions
+        onCancel={onCancel}
+        onSave={() => submit(false)}
+        onSaveAndContinue={
+          onSaveAndContinue ? () => submit(true) : undefined
+        }
+        saveLabel="Save lab results"
+        continueHint={continueHint}
+      />
     </div>
   );
 }
