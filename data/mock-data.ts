@@ -155,6 +155,9 @@ export const seedPatients: Patient[] = Array.from({ length: 47 }, (_, i) => {
     diagnosisDate: `${2026 - diagnosisYears}-${String((i % 12) + 1).padStart(2, "0")}-15`,
     ageAtDiagnosis: age - diagnosisYears,
     diseaseDurationYears: diagnosisYears,
+    ageAtSymptomOnsetYears: Math.max(10, age - diagnosisYears - 1 - (i % 4)),
+    illnessDurationMonths: diagnosisYears * 12 + 6 + (i % 6),
+    symptomOnsetToDiagnosisIntervalMonths: 6 + (i % 30),
     diseaseExtent: extent,
     severity,
     familyHistory: i % 5 === 0,
@@ -474,17 +477,33 @@ export const seedRecords: ClinicalRecords = {
       [0, 1].map((n) => ({
         id: `POUCH-${pi}-${n}`,
         patientId: p.id,
+        visitId: n === 0 ? `${p.id}-V1` : `${p.id}-V2`,
         serialNumber: n + 1,
         date: monthsAgo(4 + pi + n * 2),
+        scoreType: "PDAI",
+        pdaiStoolFrequencyId: n === 0 ? "3+" : "usual",
+        pdaiRectalBleedingId: n === 0 ? "daily" : "none",
+        pdaiFecalUrgencyId: n === 0 ? "usual" : "none",
+        pdaiFeverId: "absent",
+        pdaiEndoscopicEdema: n === 0,
+        pdaiEndoscopicGranularity: n === 0,
+        pdaiEndoscopicFriability: n === 0,
+        pdaiEndoscopicLossOfVascularPattern: n === 0,
+        pdaiEndoscopicMucusExudates: false,
+        pdaiEndoscopicUlceration: n === 0,
+        pdaiPolymorphInfiltrationId: n === 0 ? "moderate" : "mild",
+        pdaiUlcerationLpfId: n === 0 ? "25-50" : "lt25",
+        scoreValue: n === 0 ? 11 : 3,
+        inference:
+          n === 0
+            ? "Pouchitis (PDAI ≥7)"
+            : "Below PDAI pouchitis threshold",
         acuteInflammation:
           n === 0
             ? "Moderate polymorph infiltration"
             : "Mild cryptitis",
         chronicInflammation:
           n === 0 ? "Patchy chronic changes" : "Minimal chronic inflammation",
-        histologyAttachmentChecked: n === 0,
-        histologyAttachmentFileName:
-          n === 0 ? `histology-fu-${pi + 1}.pdf` : undefined,
       })),
     ),
   outcomes: seedPatients.map((p, i) => ({

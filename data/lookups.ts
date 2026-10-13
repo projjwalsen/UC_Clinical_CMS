@@ -56,13 +56,22 @@ export const PREGNANCY_OUTCOME = [
   "Stillbirth",
 ] as const;
 
+export const SURGERY_INDICATIONS = [
+  "Medical Therapy Failure",
+  "Toxic Megacolon",
+  "Colon Perforation",
+  "Uncontrolled Bleeding",
+  "Others",
+] as const;
+
+export const SURGERY_STAGES = ["Stage 1", "Stage 2", "Stage 3"] as const;
+
 export const RELAPSE_CAUSES = [
   "Non-compliance with drugs",
   "NSAID intake",
   "Antibiotic intake",
   "Stress induced",
   "Spontaneous",
-  "Injection",
   "Other",
 ] as const;
 

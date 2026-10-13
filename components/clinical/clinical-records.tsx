@@ -28,8 +28,8 @@ export function ClinicalRecordsPage({
   const { patients, records } = useDemoStore();
   const modules = [
     ["Visits", records.visits.length, CalendarDays],
-    ["Symptoms", records.symptoms.length, Activity],
-    ["Laboratory results", records.labs.length, Beaker],
+    ["Clinical Features", records.symptoms.length, Activity],
+    ["Lab Investigations", records.labs.length, Beaker],
     ["Medications", records.medications.length, Pill],
     [
       "Procedures",

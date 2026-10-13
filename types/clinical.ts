@@ -30,7 +30,7 @@ export interface Patient {
   religion: string;
   maritalStatus: string;
   children: number;
-  /** Free-text job / role (Contact & demographics) */
+  /** Free-text job / role (Contact & Socio Economic Status) */
   occupationText?: string;
   /** Kuppuswamy occupation category (head of family) */
   occupation: string;
@@ -42,6 +42,12 @@ export interface Patient {
   diagnosisDate: string;
   ageAtDiagnosis: number;
   diseaseDurationYears: number;
+  /** Clinical details — age when symptoms began (years). */
+  ageAtSymptomOnsetYears?: number;
+  /** Clinical details — total illness duration (months). */
+  illnessDurationMonths?: number;
+  /** Clinical details — months from symptom onset to diagnosis. */
+  symptomOnsetToDiagnosisIntervalMonths?: number;
   diseaseExtent: "Proctitis" | "Left-sided colitis" | "Pancolitis";
   severity: Severity;
   familyHistory: boolean;
@@ -291,7 +297,9 @@ export interface SurgeryRecord {
   stage: string;
   indication: string;
   hospitalStayDays: number;
-  outcome: string;
+  surgicalComplications?: string;
+  /** @deprecated legacy demo field */
+  outcome?: string;
 }
 export interface IPAARecord {
   id: string;
@@ -319,20 +327,35 @@ export interface PouchoscopyRecord {
   visitId?: string;
   serialNumber?: number;
   date: string;
-  cuffFindings?: string;
-  bodyFinding?: string;
-  inletFindings?: string;
-  tipOfPouchFindings?: string;
-  prePouchIleumFindings?: string;
-  diagnosis?: string;
+  /** PDAI clinical & histologic option ids (see lib/pdai-score.ts) */
+  pdaiStoolFrequencyId?: string;
+  pdaiRectalBleedingId?: string;
+  pdaiFecalUrgencyId?: string;
+  pdaiFeverId?: string;
+  pdaiEndoscopicEdema?: boolean;
+  pdaiEndoscopicGranularity?: boolean;
+  pdaiEndoscopicFriability?: boolean;
+  pdaiEndoscopicLossOfVascularPattern?: boolean;
+  pdaiEndoscopicMucusExudates?: boolean;
+  pdaiEndoscopicUlceration?: boolean;
+  pdaiPolymorphInfiltrationId?: string;
+  pdaiUlcerationLpfId?: string;
   acuteInflammation?: string;
   chronicInflammation?: string;
   scoreType?: string;
   scoreValue?: number;
   inference?: string;
   remarks?: string;
-  /** Histology report / image marked as attached (demo) */
+  /** @deprecated legacy endoscopy row fields */
+  cuffFindings?: string;
+  bodyFinding?: string;
+  inletFindings?: string;
+  tipOfPouchFindings?: string;
+  prePouchIleumFindings?: string;
+  diagnosis?: string;
+  /** @deprecated */
   histologyAttachmentChecked?: boolean;
+  /** @deprecated */
   histologyAttachmentFileName?: string;
   /** @deprecated use scoreValue */
   score?: number;

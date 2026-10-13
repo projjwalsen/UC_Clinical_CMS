@@ -1,36 +1,39 @@
 import type { ClinicalRecords } from "@/types/clinical";
 
+/** Set true to show the Pouchoscopy tab and include it in Save and continue. */
+export const POUCHOSCOPY_SECTION_ENABLED = true;
+
 /** Order for “Save and continue” after add patient and between section forms. */
 export const CLINICAL_SECTION_CHAIN: (keyof ClinicalRecords)[] = [
   "visits",
   "symptoms",
   "eims",
   "labs",
-  "medications",
   "endoscopies",
   "histopathology",
   "imaging",
   "relapses",
   "surgeries",
   "ipaa",
-  "pouchoscopies",
+  ...(POUCHOSCOPY_SECTION_ENABLED ? (["pouchoscopies"] as const) : []),
+  "medications",
 ];
 
 const SECTION_LABELS: Record<keyof ClinicalRecords, string> = {
-  visits: "Visit",
-  symptoms: "Symptoms",
+  visits: "Visit & Epidemiological",
+  symptoms: "Clinical Features",
   eims: "Extra-intestinal manifestations",
-  labs: "Laboratory results",
+  labs: "Lab Investigations",
   medications: "Medications",
   endoscopies: "Colonoscopy and endoscopic",
   histopathology: "Histopathology",
-  imaging: "Imaging",
+  imaging: "Radiological investigations",
   pregnancies: "Pregnancy",
   offspring: "Offspring",
   relapses: "Relapses",
   surgeries: "Surgery",
   ipaa: "IPAA",
-  pouchoscopies: "Histology pouchoscopy",
+  pouchoscopies: "Pouchoscopy",
   outcomes: "Outcomes",
 };
 

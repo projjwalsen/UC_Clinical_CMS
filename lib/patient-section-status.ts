@@ -1,3 +1,4 @@
+import { POUCHOSCOPY_SECTION_ENABLED } from "@/lib/clinical-workflow";
 import type { ClinicalRecords, Patient } from "@/types/clinical";
 import type { ClinicalDatasetRecord } from "@/types/clinical-report";
 
@@ -19,38 +20,36 @@ export function buildPatientSectionStatus(
   );
 
   const items: SectionStatusItem[] = [
-    section("visits", "Visits", related.visits.length),
-    section("symptoms", "Symptoms", related.symptoms.length),
+    section("visits", "Visit & Epidemiological", related.visits.length),
+    section("symptoms", "Clinical Features", related.symptoms.length),
     section("eims", "Extra-intestinal manifestations", related.eims.length),
-    section("labs", "Laboratory results", related.labs.length),
-    section("medications", "Medications", related.medications.length),
+    section("offspring", "Offspring", related.offspring.length),
+    section("labs", "Lab Investigations", related.labs.length),
     section(
       "endoscopies",
       "Colonoscopy and endoscopic",
       related.endoscopies.length,
     ),
     section("histopathology", "Histopathology", related.histopathology.length),
-    section("imaging", "Imaging", related.imaging.length),
+    section("imaging", "Radiological investigations", related.imaging.length),
+    section("relapses", "Relapses", related.relapses.length),
+    section("surgeries", "Surgery", related.surgeries.length),
+    section("ipaa", "IPAA", related.ipaa.length),
+    ...(POUCHOSCOPY_SECTION_ENABLED
+      ? [section("pouchoscopies", "Pouchoscopy", related.pouchoscopies.length)]
+      : []),
+    section("medications", "Medications", related.medications.length),
     {
       key: "clinical-dataset",
       label: "Clinical dataset",
       available: hasClinicalDataset,
       count: hasClinicalDataset ? 1 : 0,
     },
-    section("relapses", "Relapses", related.relapses.length),
-    section("surgeries", "Surgery", related.surgeries.length),
-    section("ipaa", "IPAA", related.ipaa.length),
-    section(
-      "pouchoscopies",
-      "Histology pouchoscopy",
-      related.pouchoscopies.length,
-    ),
   ];
 
   if (isFemale) {
     items.push(section("pregnancies", "Pregnancy", related.pregnancies.length));
   }
-  items.push(section("offspring", "Offspring", related.offspring.length));
 
   return items;
 }

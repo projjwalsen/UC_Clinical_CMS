@@ -205,12 +205,6 @@ export function buildVisitFormState(
       lastVisit.onsetAppendectomyIntervalMonths,
     ),
     otherRiskFactors: lastVisit.otherRiskFactors ?? "",
-    mayoStoolFrequency: str(lastVisit.mayoStoolFrequency),
-    mayoRectalBleeding: str(lastVisit.mayoRectalBleeding),
-    mayoEndoscopicFindings: str(lastVisit.mayoEndoscopicFindings),
-    mayoPhysicianGlobalAssessment: str(
-      lastVisit.mayoPhysicianGlobalAssessment,
-    ),
     clinicalState: lastVisit.clinicalState ?? base.clinicalState,
     montrealExtent: lastVisit.montrealExtent ?? base.montrealExtent,
     montrealSeverity: lastVisit.montrealSeverity ?? base.montrealSeverity,

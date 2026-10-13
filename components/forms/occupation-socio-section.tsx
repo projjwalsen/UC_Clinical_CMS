@@ -17,15 +17,8 @@ export function OccupationSocioSection({
 }) {
   return (
     <div className="mt-8 space-y-4 border-t border-slate-100 pt-8">
-      <div>
-        <h2 className="text-lg font-bold">Occupation &amp; work impact</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Optional socioeconomic impact fields aligned with the reference
-          follow-up workbook (demo values only).
-        </p>
-      </div>
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <Field label="Wage loss due to disease per month (Rs.)">
+        <Field label="Wage Loss Due to Diseases Per Month (Rs.)">
           <Input
             type="number"
             min={0}
@@ -34,7 +27,7 @@ export function OccupationSocioSection({
             placeholder="Optional"
           />
         </Field>
-        <Field label="Days absent from work per month">
+        <Field label="Days Absent from Work Per Month">
           <Input
             type="number"
             min={0}
@@ -46,7 +39,7 @@ export function OccupationSocioSection({
             placeholder="Optional"
           />
         </Field>
-        <Field label="Money spent for treatment per month (Rs.)">
+        <Field label="Money Spent for Treatment Per Month (Rs.)">
           <Input
             type="number"
             min={0}
@@ -56,7 +49,7 @@ export function OccupationSocioSection({
           />
         </Field>
       </div>
-      <Field label="Other socio-economic information">
+      <Field label="Other Socio-Economic Information">
         <Textarea
           value={otherSocioEconomicInfo}
           onChange={(e) => onChange("otherSocioEconomicInfo", e.target.value)}

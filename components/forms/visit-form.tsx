@@ -34,7 +34,7 @@ import type { Visit } from "@/types/clinical";
 const steps = [
   "Visit & epidemiology",
   "Physical examination",
-  "Clinical follow-up",
+  "Clinical follow-up & Mayo Score",
   "Review & save",
 ];
 
@@ -349,6 +349,15 @@ export function VisitForm({
 
         {step === 2 && (
           <div className="space-y-8">
+            <Section title="Clinical follow-up">
+              {select("clinicalState", "Clinical state", CLINICAL_STATE)}
+              {textarea("complication", "Complication")}
+              {input("newEim", "New EIM")}
+              {input("uceis", "UCEIS", false, "number")}
+              {select("admission", "Admission", YES_NO)}
+              {textarea("specialComment", "Special comment")}
+            </Section>
+
             <MayoScoreSection
               stoolFrequency={form.mayoStoolFrequency}
               rectalBleeding={form.mayoRectalBleeding}
@@ -361,15 +370,6 @@ export function VisitForm({
                 set(key as keyof VisitFormState, value)
               }
             />
-
-            <Section title="Clinical follow-up">
-              {select("clinicalState", "Clinical state", CLINICAL_STATE)}
-              {textarea("complication", "Complication")}
-              {input("newEim", "New EIM")}
-              {input("uceis", "UCEIS", false, "number")}
-              {select("admission", "Admission", YES_NO)}
-              {textarea("specialComment", "Special comment")}
-            </Section>
 
             <Section title="Montreal classification">
               {select("montrealExtent", "Montreal extent", DISEASE_EXTENT)}
@@ -393,6 +393,7 @@ export function VisitForm({
                     "Montreal",
                     `${form.montrealExtent} / ${form.montrealSeverity}`,
                   ],
+                  ["UCEIS", form.uceis || "—"],
                   [
                     "Partial Mayo",
                     mayoScores.partialMayoScore !== undefined

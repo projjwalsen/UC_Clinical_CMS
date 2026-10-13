@@ -89,7 +89,9 @@ export function buildClinicalRecordForPatient(
     modifiers: index % 4 === 0 ? [2] : index % 6 === 0 ? [1] : [],
     ageAtDiagnosis: patient.ageAtDiagnosis,
     diseaseBehaviour: ((index % 3) + 1) as 1 | 2 | 3,
-    illnessDurationMonths: patient.diseaseDurationYears * 12 + (index % 6),
+    illnessDurationMonths:
+      patient.illnessDurationMonths ??
+      patient.diseaseDurationYears * 12 + (index % 6),
     familyHistoryOfIBD: patient.familyHistory ? 1 : 0,
     diseaseActivity: incomplete ? undefined : index % 3 === 0 ? 1 : 2,
     currentTherapies: therapies,

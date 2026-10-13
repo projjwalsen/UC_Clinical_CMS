@@ -25,7 +25,7 @@ import { getContinueSectionLabel } from "@/lib/clinical-workflow";
 
 const steps = [
   "Identification",
-  "Contact & demographics",
+  "Contact & Socio Economic Status",
   "Disease information",
   "Review",
 ];
@@ -53,6 +53,9 @@ const initial = {
   monthlyFamilyIncome: "",
   diet: "Non-vegetarian",
   diagnosisDate: "",
+  ageAtSymptomOnsetYears: "",
+  illnessDurationMonths: "",
+  symptomOnsetToDiagnosisIntervalMonths: "",
   diseaseExtent: "Left-sided colitis",
   severity: "Moderate",
   familyHistory: "No",
@@ -160,6 +163,14 @@ export function PatientForm({
         new Date(form.diagnosisDate) < new Date(form.dateOfBirth)
       )
         next.diagnosisDate = "Diagnosis cannot precede birth.";
+      if (
+        form.ageAtSymptomOnsetYears &&
+        ageAtDiagnosis &&
+        Number(form.ageAtSymptomOnsetYears) > ageAtDiagnosis
+      ) {
+        next.ageAtSymptomOnsetYears =
+          "Symptom onset age cannot exceed age at diagnosis.";
+      }
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -202,6 +213,16 @@ export function PatientForm({
       diagnosisDate: form.diagnosisDate,
       ageAtDiagnosis,
       diseaseDurationYears: duration,
+      ageAtSymptomOnsetYears: form.ageAtSymptomOnsetYears
+        ? Number(form.ageAtSymptomOnsetYears)
+        : undefined,
+      illnessDurationMonths: form.illnessDurationMonths
+        ? Number(form.illnessDurationMonths)
+        : undefined,
+      symptomOnsetToDiagnosisIntervalMonths:
+        form.symptomOnsetToDiagnosisIntervalMonths
+          ? Number(form.symptomOnsetToDiagnosisIntervalMonths)
+          : undefined,
       diseaseExtent: form.diseaseExtent as Patient["diseaseExtent"],
       severity: form.severity as Patient["severity"],
       familyHistory: form.familyHistory === "Yes",
@@ -341,7 +362,9 @@ export function PatientForm({
         )}
         {step === 1 && (
           <div>
-            <h2 className="mb-5 text-lg font-bold">Contact and demographics</h2>
+            <h2 className="mb-5 text-lg font-bold">
+              Contact & Socio Economic Status
+            </h2>
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {input("address", "Present address", true)}
               {input("city", "City / village", true)}
@@ -417,11 +440,45 @@ export function PatientForm({
                 monthlyFamilyIncome: errors.monthlyFamilyIncome,
               }}
             />
+            <OccupationSocioSection
+              wageLossPerMonthRs={form.wageLossPerMonthRs}
+              daysAbsentFromWorkPerMonth={form.daysAbsentFromWorkPerMonth}
+              treatmentCostPerMonthRs={form.treatmentCostPerMonthRs}
+              otherSocioEconomicInfo={form.otherSocioEconomicInfo}
+              onChange={(key, value) =>
+                set(key as keyof typeof form, value)
+              }
+            />
           </div>
         )}
         {step === 2 && (
           <div>
             <h2 className="mb-5 text-lg font-bold">Disease information</h2>
+            <div className="mb-8 space-y-4 rounded-xl border border-slate-200 bg-slate-50/40 p-5">
+              <h3 className="text-sm font-bold text-slate-800">
+                Clinical details
+              </h3>
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {input(
+                  "ageAtSymptomOnsetYears",
+                  "Age at Symptom Onset (Years)",
+                  false,
+                  "number",
+                )}
+                {input(
+                  "illnessDurationMonths",
+                  "Duration of Illness (Months)",
+                  false,
+                  "number",
+                )}
+                {input(
+                  "symptomOnsetToDiagnosisIntervalMonths",
+                  "Interval Between Onset of Symptoms and Diagnosis (Months)",
+                  false,
+                  "number",
+                )}
+              </div>
+            </div>
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {input("diagnosisDate", "Date of diagnosis", true, "date")}
               <Field label="Age at diagnosis">
@@ -456,15 +513,6 @@ export function PatientForm({
               ])}
               {input("comorbidities", "Relevant comorbidities")}
             </div>
-            <OccupationSocioSection
-              wageLossPerMonthRs={form.wageLossPerMonthRs}
-              daysAbsentFromWorkPerMonth={form.daysAbsentFromWorkPerMonth}
-              treatmentCostPerMonthRs={form.treatmentCostPerMonthRs}
-              otherSocioEconomicInfo={form.otherSocioEconomicInfo}
-              onChange={(key, value) =>
-                set(key as keyof typeof form, value)
-              }
-            />
             <div className="mt-5">
               <Field label="Clinical notes">
                 <Textarea
@@ -501,6 +549,22 @@ export function PatientForm({
                 ],
                 ["Registered", form.registrationDate],
                 ["Diagnosis", form.diagnosisDate],
+                [
+                  "Age at symptom onset",
+                  form.ageAtSymptomOnsetYears || "Not recorded",
+                ],
+                [
+                  "Duration of illness",
+                  form.illnessDurationMonths
+                    ? `${form.illnessDurationMonths} months`
+                    : "Not recorded",
+                ],
+                [
+                  "Onset to diagnosis interval",
+                  form.symptomOnsetToDiagnosisIntervalMonths
+                    ? `${form.symptomOnsetToDiagnosisIntervalMonths} months`
+                    : "Not recorded",
+                ],
                 ["Extent", form.diseaseExtent],
                 ["Severity", form.severity],
                 ["Status", form.status],

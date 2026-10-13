@@ -74,7 +74,7 @@ export function KuppuswamySection({
     occupation?: string;
     monthlyFamilyIncome?: string;
   };
-  /** When occupation is captured elsewhere (e.g. Contact & demographics) */
+  /** When occupation is captured elsewhere (e.g. Contact & Socio Economic Status) */
   hideOccupation?: boolean;
 }) {
   const result = calculateKuppuswamy(education, occupation, monthlyFamilyIncome);
