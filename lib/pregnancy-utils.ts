@@ -73,13 +73,68 @@ export function buildPregnancyFormState(
   };
 }
 
+const str = (value?: number) =>
+  value === undefined || value === null ? "" : String(value);
+
+export function pregnancyRecordToRow(record: PregnancyRecord): PregnancyRowState {
+  return {
+    id: record.id,
+    pregnancyNumber: str(record.pregnancyNumber),
+    pregnancyYear: str(pregnancyYear(record)),
+    pregnancyMonth: str(record.pregnancyMonth),
+    durationWeeks: str(record.durationWeeks),
+    activityAtConception: record.activityAtConception ?? "",
+    courseDuringPregnancy: record.courseDuringPregnancy ?? "",
+    newUcComplication: record.newUcComplication ?? "",
+    pregnancyOutcome: pregnancyOutcomeLabel(record) ?? "",
+    prematureDelivery: record.prematureDelivery ?? "",
+    forcepsDelivery: record.forcepsDelivery ?? "",
+    maternalLowBirthWeightFlag: record.maternalLowBirthWeightFlag ?? "",
+    maternalSgaFlag: record.maternalSgaFlag ?? "",
+    courseAfterYear1: record.courseAfterYear1 ?? "",
+    courseAfterYear2: record.courseAfterYear2 ?? "",
+    infantBirthYear: str(record.infantBirthYear),
+    infantBirthWeightKg: str(record.infantBirthWeightKg),
+    congenitalMalformation: record.congenitalMalformation ?? "",
+    infantLowBirthWeight: record.infantLowBirthWeight ?? "",
+    infantSga: record.infantSga ?? "",
+    remarks: pregnancyRemarks(record) ?? "",
+  };
+}
+
+/** Rows for the merged form: one section per No. of pregnancy, filled from saved rows. */
+export function pregnancyRowsForCount(
+  existingRecords: PregnancyRecord[],
+  countValue?: number,
+): PregnancyRowState[] {
+  const existingRows = [...existingRecords]
+    .sort(
+      (a, b) =>
+        (a.pregnancyNumber ?? 0) - (b.pregnancyNumber ?? 0) ||
+        a.id.localeCompare(b.id),
+    )
+    .map(pregnancyRecordToRow);
+  const stored = countValue ?? existingRows.length;
+  const requested = Number.isFinite(stored) ? stored : existingRows.length;
+  const count = Math.max(
+    0,
+    Math.min(10, Math.max(requested, existingRows.length)),
+  );
+  if (count === 0) return [];
+  return resizePregnancyRows(existingRows, count, 1);
+}
+
 export function pregnancyFormToRecords(
   form: PregnancyFormState,
   patientId: string,
   batchId: string,
 ): PregnancyRecord[] {
   return form.rows.map((row, index) =>
-    pregnancyRowToRecord(row, patientId, `${batchId}-${index + 1}`),
+    pregnancyRowToRecord(
+      row,
+      patientId,
+      row.id.startsWith("preg-row-") ? `${batchId}-${index + 1}` : row.id,
+    ),
   );
 }
 

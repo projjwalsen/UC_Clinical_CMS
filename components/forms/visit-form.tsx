@@ -19,8 +19,10 @@ import {
 } from "@/data/lookups";
 import { MayoScoreSection } from "@/components/forms/mayo-score-section";
 import {
+  ageAtDiagnosisYears,
   buildVisitFormState,
   calculateBmi,
+  diseaseDurationYears,
   mayoScoresFromVisitForm,
   nextVisitId,
   visitFormToRecord,
@@ -29,10 +31,24 @@ import {
 } from "@/lib/visit-utils";
 import { completeMayoSeverity, partialMayoSeverity } from "@/lib/mayo-score";
 import { Button, Field, Input, Select, Textarea } from "@/components/ui/core";
-import type { Visit } from "@/types/clinical";
+import type { Patient, Visit } from "@/types/clinical";
+
+const DISEASE_EXTENT_LABELS = [
+  "Proctitis",
+  "Left-sided colitis",
+  "Pancolitis",
+] as const;
+const DISEASE_SEVERITY = ["Mild", "Moderate", "Severe"] as const;
+const DISEASE_STATUS = [
+  "Remission",
+  "Active disease",
+  "Relapse",
+  "Post-surgery",
+] as const;
 
 const steps = [
   "Visit & epidemiology",
+  "Disease information",
   "Physical examination",
   "Clinical follow-up & Mayo Score",
   "Review & save",
@@ -62,6 +78,7 @@ function Section({
 
 export function VisitForm({
   patientId,
+  patient,
   visitCount,
   patientVisits,
   editingVisit,
@@ -72,6 +89,7 @@ export function VisitForm({
   continueHint,
 }: {
   patientId: string;
+  patient: Patient;
   visitCount: number;
   patientVisits: Visit[];
   editingVisit?: Visit | null;
@@ -84,8 +102,8 @@ export function VisitForm({
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<VisitFormState>(() =>
     editingVisit
-      ? visitToFormState(editingVisit)
-      : buildVisitFormState(visitCount, lastVisit ?? null),
+      ? visitToFormState(editingVisit, patient)
+      : buildVisitFormState(visitCount, lastVisit ?? null, patient),
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [visitId, setVisitId] = useState(
@@ -98,15 +116,20 @@ export function VisitForm({
   useEffect(() => {
     const existing = patientVisits.find((visit) => visit.date === form.date);
     if (existing && existing.id !== visitId) {
-      setForm(visitToFormState(existing));
+      setForm(visitToFormState(existing, patient));
       setVisitId(existing.id);
       setLoadedExistingVisit(true);
     }
-  }, [form.date, patientVisits, visitId]);
+  }, [form.date, patient, patientVisits, visitId]);
   const heightM = Number(form.heightM);
   const weightKg = Number(form.weightKg);
   const bmi = calculateBmi(heightM, weightKg);
   const mayoScores = useMemo(() => mayoScoresFromVisitForm(form), [form]);
+  const computedAgeAtDiagnosis = ageAtDiagnosisYears(
+    form.diagnosisDate,
+    patient.dateOfBirth,
+  );
+  const computedDuration = diseaseDurationYears(form.diagnosisDate);
 
   const set = (key: keyof VisitFormState, value: string) => {
     setForm((f) => ({ ...f, [key]: value }));
@@ -170,7 +193,24 @@ export function VisitForm({
       if (form.weightKg && Number(form.weightKg) <= 0)
         next.weightKg = "Enter a valid weight in kg.";
     }
-    if (targetStep === 2) {
+    if (targetStep === 1) {
+      if (!form.diagnosisDate)
+        next.diagnosisDate = "Date of diagnosis is required.";
+      else if (
+        patient.dateOfBirth &&
+        new Date(form.diagnosisDate) < new Date(patient.dateOfBirth)
+      )
+        next.diagnosisDate = "Diagnosis cannot precede birth.";
+      if (
+        form.ageAtSymptomOnsetYears &&
+        computedAgeAtDiagnosis &&
+        Number(form.ageAtSymptomOnsetYears) > computedAgeAtDiagnosis
+      ) {
+        next.ageAtSymptomOnsetYears =
+          "Symptom onset age cannot exceed age at diagnosis.";
+      }
+    }
+    if (targetStep === 3) {
       if (!form.mayoStoolFrequency)
         next.mayoStoolFrequency = "Select stool frequency (I).";
       if (!form.mayoRectalBleeding)
@@ -190,6 +230,8 @@ export function VisitForm({
     const mayoErrors: Record<string, string> = {};
     if (!form.date) visitErrors.date = "Visit date is required.";
     if (!form.type) visitErrors.type = "Visit type is required.";
+    if (!form.diagnosisDate)
+      visitErrors.diagnosisDate = "Date of diagnosis is required.";
     if (!form.mayoStoolFrequency)
       mayoErrors.mayoStoolFrequency = "Select stool frequency (I).";
     if (!form.mayoRectalBleeding)
@@ -218,7 +260,7 @@ export function VisitForm({
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-slate-100 px-6 py-4">
-        <div className="mb-3 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white sm:grid-cols-4">
+        <div className="mb-3 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white sm:grid-cols-5">
           {steps.map((label, i) => (
             <div
               key={label}
@@ -334,6 +376,61 @@ export function VisitForm({
         )}
 
         {step === 1 && (
+          <div className="space-y-8">
+            <Section title="Clinical details">
+              {input(
+                "ageAtSymptomOnsetYears",
+                "Age at symptom onset (years)",
+                false,
+                "number",
+              )}
+              {input(
+                "illnessDurationMonths",
+                "Duration of illness (months)",
+                false,
+                "number",
+              )}
+              {input(
+                "symptomOnsetToDiagnosisIntervalMonths",
+                "Interval between onset of symptoms and diagnosis (months)",
+                false,
+                "number",
+              )}
+            </Section>
+            <Section title="Disease information">
+              {input("diagnosisDate", "Date of diagnosis", true, "date")}
+              <Field label="Age at diagnosis">
+                <Input value={computedAgeAtDiagnosis || ""} disabled />
+              </Field>
+              <Field label="Disease duration">
+                <Input
+                  value={form.diagnosisDate ? `${computedDuration} years` : ""}
+                  disabled
+                />
+              </Field>
+              {select(
+                "diseaseExtent",
+                "Disease extent",
+                DISEASE_EXTENT_LABELS,
+                true,
+              )}
+              {select("severity", "Disease severity", DISEASE_SEVERITY, true)}
+              {select("familyHistory", "Family history", ["No", "Yes"])}
+              {select("diseaseStatus", "Current disease status", DISEASE_STATUS)}
+            </Section>
+            <div>
+              <Field label="Clinical notes" error={errors.clinicalNotes}>
+                <Textarea
+                  value={form.clinicalNotes}
+                  onChange={(e) => set("clinicalNotes", e.target.value)}
+                  placeholder="Relevant clinical context…"
+                />
+              </Field>
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
           <Section title="Physical examination">
             {textarea("generalSurvey", "General survey")}
             {input("anemia", "Anemia")}
@@ -347,7 +444,7 @@ export function VisitForm({
           </Section>
         )}
 
-        {step === 2 && (
+        {step === 3 && (
           <div className="space-y-8">
             <Section title="Clinical follow-up">
               {select("clinicalState", "Clinical state", CLINICAL_STATE)}
@@ -378,7 +475,7 @@ export function VisitForm({
           </div>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <div className="space-y-6">
             <div>
               <h3 className="mb-4 text-sm font-bold text-slate-800">
@@ -388,6 +485,10 @@ export function VisitForm({
                 {[
                   ["Visit type", form.type],
                   ["Date", form.date],
+                  ["Diagnosis", form.diagnosisDate || "—"],
+                  ["Extent", form.diseaseExtent],
+                  ["Severity", form.severity],
+                  ["Disease status", form.diseaseStatus],
                   ["Clinical state", form.clinicalState],
                   [
                     "Montreal",

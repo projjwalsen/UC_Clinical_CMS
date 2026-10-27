@@ -12,72 +12,35 @@ import {
   SMOKING_STATUS,
   SYMPTOMS,
   EIM_MANIFESTATIONS,
+  EXTENT_AT_PRESENTATION,
+  SEVERITY_AT_PRESENTATION,
   VISIT_TYPE,
   YES_NO,
 } from "@/data/lookups";
 
-const firstNames = [
-  "Aarav",
-  "Ananya",
-  "Ishaan",
-  "Meera",
-  "Kabir",
-  "Diya",
-  "Rohan",
-  "Saanvi",
-  "Arjun",
-  "Nisha",
-  "Vivaan",
-  "Priya",
-  "Aditya",
-  "Tara",
-  "Neel",
-  "Kavya",
-  "Rahul",
-  "Ira",
-  "Dev",
-  "Leela",
+/** 12 male and 8 female. Names, ages, and addresses are fixed so the demo cohort stays stable. */
+const cohort = [
+  { name: "Arindam Banerjee", gender: "Male" as const, age: 34, city: "Kolkata", locality: "Salt Lake, Sector V", pinCode: "700091", policeStation: "Bidhannagar PS", maritalStatus: "Married", children: 1, religion: "Hindu", occupationText: "Software engineer", diet: "Non-vegetarian", diagnosisYears: 6, extent: "Left-sided colitis" as const, severity: "Moderate" as const, status: "Active disease" as const, smoking: "Never" as const, familyHistory: false, comorbidities: [] as string[] },
+  { name: "Soumya Chatterjee", gender: "Male" as const, age: 41, city: "Kolkata", locality: "Ballygunge Place", pinCode: "700019", policeStation: "Ballygunge PS", maritalStatus: "Married", children: 2, religion: "Hindu", occupationText: "Physician", diet: "Non-vegetarian", diagnosisYears: 9, extent: "Pancolitis" as const, severity: "Severe" as const, status: "Relapse" as const, smoking: "Ex-smoker" as const, familyHistory: true, comorbidities: [] as string[] },
+  { name: "Debashish Mukherjee", gender: "Male" as const, age: 28, city: "Kolkata", locality: "Jadavpur", pinCode: "700032", policeStation: "Jadavpur PS", maritalStatus: "Single", children: 0, religion: "Hindu", occupationText: "School teacher", diet: "Non-vegetarian", diagnosisYears: 3, extent: "Proctitis" as const, severity: "Mild" as const, status: "Remission" as const, smoking: "Never" as const, familyHistory: false, comorbidities: [] as string[] },
+  { name: "Anirban Ghosh", gender: "Male" as const, age: 52, city: "Howrah", locality: "Shibpur", pinCode: "711102", policeStation: "Shibpur PS", maritalStatus: "Married", children: 2, religion: "Hindu", occupationText: "Railway technician", diet: "Non-vegetarian", diagnosisYears: 14, extent: "Left-sided colitis" as const, severity: "Moderate" as const, status: "Post-surgery" as const, smoking: "Ex-smoker" as const, familyHistory: false, comorbidities: ["Hypertension"] },
+  { name: "Imran Hossain", gender: "Male" as const, age: 23, city: "Kolkata", locality: "Dum Dum", pinCode: "700028", policeStation: "Dum Dum PS", maritalStatus: "Single", children: 0, religion: "Muslim", occupationText: "Accounts assistant", diet: "Non-vegetarian", diagnosisYears: 2, extent: "Pancolitis" as const, severity: "Severe" as const, status: "Active disease" as const, smoking: "Never" as const, familyHistory: false, comorbidities: [] as string[] },
+  { name: "Rajib Roy", gender: "Male" as const, age: 47, city: "Kolkata", locality: "Behala", pinCode: "700034", policeStation: "Behala PS", maritalStatus: "Married", children: 1, religion: "Hindu", occupationText: "Bank officer", diet: "Non-vegetarian", diagnosisYears: 11, extent: "Left-sided colitis" as const, severity: "Mild" as const, status: "Remission" as const, smoking: "Current" as const, familyHistory: false, comorbidities: ["Type 2 diabetes"] },
+  { name: "Subrata Sen", gender: "Male" as const, age: 61, city: "Kolkata", locality: "Shyambazar", pinCode: "700004", policeStation: "Shyampukur PS", maritalStatus: "Married", children: 3, religion: "Hindu", occupationText: "Shopkeeper", diet: "Non-vegetarian", diagnosisYears: 18, extent: "Pancolitis" as const, severity: "Moderate" as const, status: "Remission" as const, smoking: "Ex-smoker" as const, familyHistory: false, comorbidities: ["Hypertension"] },
+  { name: "Partha Bose", gender: "Male" as const, age: 36, city: "Kolkata", locality: "Lake Town", pinCode: "700089", policeStation: "Lake Town PS", maritalStatus: "Married", children: 1, religion: "Hindu", occupationText: "Architect", diet: "Vegetarian", diagnosisYears: 4, extent: "Proctitis" as const, severity: "Mild" as const, status: "Active disease" as const, smoking: "Never" as const, familyHistory: false, comorbidities: [] as string[] },
+  { name: "Amitava Dutta", gender: "Male" as const, age: 19, city: "Kolkata", locality: "New Town", pinCode: "700156", policeStation: "New Town PS", maritalStatus: "Single", children: 0, religion: "Hindu", occupationText: "College student", diet: "Non-vegetarian", diagnosisYears: 1, extent: "Left-sided colitis" as const, severity: "Moderate" as const, status: "Active disease" as const, smoking: "Never" as const, familyHistory: true, comorbidities: [] as string[] },
+  { name: "Sourav Chakraborty", gender: "Male" as const, age: 44, city: "Barasat", locality: "Barasat", pinCode: "700124", policeStation: "Barasat PS", maritalStatus: "Married", children: 2, religion: "Hindu", occupationText: "Government clerk", diet: "Non-vegetarian", diagnosisYears: 8, extent: "Pancolitis" as const, severity: "Severe" as const, status: "Relapse" as const, smoking: "Never" as const, familyHistory: false, comorbidities: [] as string[] },
+  { name: "Indranil Sarkar", gender: "Male" as const, age: 31, city: "Siliguri", locality: "Hakimpara", pinCode: "734001", policeStation: "Siliguri PS", maritalStatus: "Married", children: 0, religion: "Hindu", occupationText: "Electrician", diet: "Non-vegetarian", diagnosisYears: 5, extent: "Left-sided colitis" as const, severity: "Moderate" as const, status: "Remission" as const, smoking: "Never" as const, familyHistory: false, comorbidities: [] as string[] },
+  { name: "Kaushik Pal", gender: "Male" as const, age: 56, city: "Durgapur", locality: "Benachity", pinCode: "713213", policeStation: "Durgapur PS", maritalStatus: "Married", children: 2, religion: "Hindu", occupationText: "Engineer", diet: "Non-vegetarian", diagnosisYears: 16, extent: "Pancolitis" as const, severity: "Moderate" as const, status: "Post-surgery" as const, smoking: "Ex-smoker" as const, familyHistory: false, comorbidities: ["Hypertension"] },
+  { name: "Ananya Mondal", gender: "Female" as const, age: 29, city: "Asansol", locality: "Burnpur", pinCode: "713325", policeStation: "Asansol PS", maritalStatus: "Married", children: 1, religion: "Hindu", occupationText: "Nurse", diet: "Non-vegetarian", diagnosisYears: 5, extent: "Left-sided colitis" as const, severity: "Moderate" as const, status: "Remission" as const, smoking: "Never" as const, familyHistory: false, comorbidities: [] as string[] },
+  { name: "Rituparna Bhattacharya", gender: "Female" as const, age: 38, city: "Kalyani", locality: "Kalyani", pinCode: "741235", policeStation: "Kalyani PS", maritalStatus: "Married", children: 2, religion: "Hindu", occupationText: "College lecturer", diet: "Vegetarian", diagnosisYears: 10, extent: "Pancolitis" as const, severity: "Severe" as const, status: "Active disease" as const, smoking: "Never" as const, familyHistory: true, comorbidities: [] as string[] },
+  { name: "Nasima Khatun", gender: "Female" as const, age: 24, city: "Chandannagar", locality: "Chandannagar", pinCode: "712136", policeStation: "Chandannagar PS", maritalStatus: "Single", children: 0, religion: "Muslim", occupationText: "Content writer", diet: "Non-vegetarian", diagnosisYears: 2, extent: "Proctitis" as const, severity: "Mild" as const, status: "Remission" as const, smoking: "Never" as const, familyHistory: false, comorbidities: [] as string[] },
+  { name: "Madhumita Basu", gender: "Female" as const, age: 45, city: "Kolkata", locality: "Park Circus", pinCode: "700017", policeStation: "Beniapukur PS", maritalStatus: "Married", children: 2, religion: "Hindu", occupationText: "Tailor", diet: "Non-vegetarian", diagnosisYears: 12, extent: "Left-sided colitis" as const, severity: "Moderate" as const, status: "Relapse" as const, smoking: "Never" as const, familyHistory: false, comorbidities: [] as string[] },
+  { name: "Paromita Ganguly", gender: "Female" as const, age: 33, city: "Kolkata", locality: "Baguiati", pinCode: "700059", policeStation: "Baguiati PS", maritalStatus: "Married", children: 1, religion: "Hindu", occupationText: "Pharmacist", diet: "Non-vegetarian", diagnosisYears: 7, extent: "Pancolitis" as const, severity: "Mild" as const, status: "Remission" as const, smoking: "Never" as const, familyHistory: false, comorbidities: [] as string[] },
+  { name: "Shreya Saha", gender: "Female" as const, age: 21, city: "Barrackpore", locality: "Barrackpore", pinCode: "700120", policeStation: "Barrackpore PS", maritalStatus: "Single", children: 0, religion: "Hindu", occupationText: "College student", diet: "Non-vegetarian", diagnosisYears: 1, extent: "Left-sided colitis" as const, severity: "Moderate" as const, status: "Active disease" as const, smoking: "Never" as const, familyHistory: false, comorbidities: [] as string[] },
+  { name: "Aparna Kundu", gender: "Female" as const, age: 50, city: "Serampore", locality: "Serampore", pinCode: "712201", policeStation: "Serampore PS", maritalStatus: "Married", children: 3, religion: "Hindu", occupationText: "Homemaker", diet: "Non-vegetarian", diagnosisYears: 15, extent: "Pancolitis" as const, severity: "Severe" as const, status: "Post-surgery" as const, smoking: "Never" as const, familyHistory: false, comorbidities: ["Type 2 diabetes"] },
+  { name: "Moumita Hazra", gender: "Female" as const, age: 27, city: "Kolkata", locality: "Garia", pinCode: "700084", policeStation: "Patuli PS", maritalStatus: "Married", children: 1, religion: "Hindu", occupationText: "School office staff", diet: "Vegetarian", diagnosisYears: 4, extent: "Proctitis" as const, severity: "Mild" as const, status: "Remission" as const, smoking: "Never" as const, familyHistory: false, comorbidities: [] as string[] },
 ];
-const lastNames = [
-  "Bose",
-  "Kapoor",
-  "Mehta",
-  "Sen",
-  "Rao",
-  "Nair",
-  "Das",
-  "Shah",
-  "Iyer",
-  "Gupta",
-];
-const cities = [
-  "Kolkata",
-  "Pune",
-  "Mumbai",
-  "Chennai",
-  "Bengaluru",
-  "Hyderabad",
-  "Jaipur",
-  "Kochi",
-];
-const states: Record<string, string> = {
-  Kolkata: "West Bengal",
-  Pune: "Maharashtra",
-  Mumbai: "Maharashtra",
-  Chennai: "Tamil Nadu",
-  Bengaluru: "Karnataka",
-  Hyderabad: "Telangana",
-  Jaipur: "Rajasthan",
-  Kochi: "Kerala",
-};
-const extents = ["Proctitis", "Left-sided colitis", "Pancolitis"] as const;
-const severities = ["Mild", "Moderate", "Severe"] as const;
-const statuses = [
-  "Remission",
-  "Active disease",
-  "Relapse",
-  "Post-surgery",
-] as const;
 const kuppuswamyEducations = [
   "Professional Degree",
   "Graduate",
@@ -100,75 +63,61 @@ const kuppuswamyIncomes = [
   "27,883 – 46,474",
   "9,308 – 27,882",
 ] as const;
-const policeStations = [
-  "Park Street PS",
-  "Ballygunge PS",
-  "T Nagar PS",
-  "Andheri PS",
-  "Koramangala PS",
-  "Jubilee Hills PS",
-  "Malviya Nagar PS",
-  "Marine Drive PS",
-];
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const monthsAgo = (n: number) => iso(new Date(2026, 8 - n, 6 + (n % 18)));
 
-export const seedPatients: Patient[] = Array.from({ length: 47 }, (_, i) => {
-  const age = 18 + ((i * 7) % 55);
-  const gender = i % 2 === 0 ? "Male" : "Female";
-  const extent = extents[i % extents.length];
-  const severity = severities[(i * 2) % severities.length];
-  const status = statuses[i % statuses.length];
-  const city = cities[i % cities.length];
-  const registrationDate = monthsAgo(i % 18);
-  const diagnosisYears = 1 + (i % 13);
+export const seedPatients: Patient[] = cohort.map((person, i) => {
   const education = kuppuswamyEducations[i % kuppuswamyEducations.length];
   const occupation = kuppuswamyOccupations[i % kuppuswamyOccupations.length];
   const monthlyFamilyIncome = kuppuswamyIncomes[i % kuppuswamyIncomes.length];
-  const kuppuswamy = calculateKuppuswamy(education, occupation, monthlyFamilyIncome);
+  const kuppuswamy = calculateKuppuswamy(
+    education,
+    occupation,
+    monthlyFamilyIncome,
+  );
+  const ageAtDiagnosis = person.age - person.diagnosisYears;
+  const slug = person.name.toLowerCase().replace(/[^a-z]+/g, ".");
   return {
     id: `UC-${String(1101 + i).padStart(4, "0")}`,
     ibdCode: `IBD-${String(i + 1).padStart(4, "0")}`,
-    name: `${firstNames[i % firstNames.length]} ${lastNames[(i * 3) % lastNames.length]}`,
-    dateOfBirth: `${2026 - age}-${String((i % 12) + 1).padStart(2, "0")}-${String((i % 25) + 1).padStart(2, "0")}`,
-    age,
-    gender,
-    registrationDate,
-    address: `${21 + i}, Lakeview Road`,
-    city,
-    state: states[city],
+    name: person.name,
+    dateOfBirth: `${2026 - person.age}-${String((i % 12) + 1).padStart(2, "0")}-${String((i % 27) + 1).padStart(2, "0")}`,
+    age: person.age,
+    gender: person.gender,
+    registrationDate: monthsAgo(8 + (i % 16)),
+    address: `${12 + i * 3}, ${person.locality}`,
+    city: person.city,
+    state: "West Bengal",
     country: "India",
-    pinCode: `${700001 + i}`,
-    policeStation: policeStations[i % policeStations.length],
-    phone: `90000${String(12000 + i)}`,
-    alternatePhone: i % 4 ? undefined : `80000${String(21000 + i)}`,
-    email: `${firstNames[i % firstNames.length].toLowerCase()}.${i + 1}@example.test`,
-    religion: ["Hindu", "Muslim", "Christian", "Other"][i % 4],
-    maritalStatus: i % 3 ? "Married" : "Single",
-    children: i % 3,
+    pinCode: person.pinCode,
+    policeStation: person.policeStation,
+    phone: `98${String(31012000 + i * 137).slice(0, 8)}`,
+    alternatePhone: i % 3 === 0 ? `90${String(51022000 + i * 91).slice(0, 8)}` : undefined,
+    email: `${slug}@example.test`,
+    religion: person.religion,
+    maritalStatus: person.maritalStatus,
+    children: person.children,
+    occupationText: person.occupationText,
     occupation,
     education,
-    diet: i % 3 ? "Non-vegetarian" : "Vegetarian",
+    diet: person.diet,
     monthlyFamilyIncome,
     kuppuswamyScore: kuppuswamy.totalScore,
     socioeconomicCategory: kuppuswamy.socioeconomicCategory,
-    diagnosisDate: `${2026 - diagnosisYears}-${String((i % 12) + 1).padStart(2, "0")}-15`,
-    ageAtDiagnosis: age - diagnosisYears,
-    diseaseDurationYears: diagnosisYears,
-    ageAtSymptomOnsetYears: Math.max(10, age - diagnosisYears - 1 - (i % 4)),
-    illnessDurationMonths: diagnosisYears * 12 + 6 + (i % 6),
-    symptomOnsetToDiagnosisIntervalMonths: 6 + (i % 30),
-    diseaseExtent: extent,
-    severity,
-    familyHistory: i % 5 === 0,
-    smokingStatus: ["Never", "Ex-smoker", "Current"][
-      i % 3
-    ] as Patient["smokingStatus"],
-    status,
-    comorbidities:
-      i % 4 === 0 ? ["Hypertension"] : i % 7 === 0 ? ["Type 2 diabetes"] : [],
-    notes: "Synthetic demonstration record created for prototype evaluation.",
-    lastVisit: monthsAgo(i % 5),
+    diagnosisDate: `${2026 - person.diagnosisYears}-${String((i % 12) + 1).padStart(2, "0")}-15`,
+    ageAtDiagnosis,
+    diseaseDurationYears: person.diagnosisYears,
+    ageAtSymptomOnsetYears: Math.max(10, ageAtDiagnosis - (person.diagnosisYears > 2 ? 1 : 0)),
+    illnessDurationMonths: person.diagnosisYears * 12 + 3 + (i % 5),
+    symptomOnsetToDiagnosisIntervalMonths: 3 + (i % 16),
+    diseaseExtent: person.extent,
+    severity: person.severity,
+    familyHistory: person.familyHistory,
+    smokingStatus: person.smoking,
+    status: person.status,
+    comorbidities: person.comorbidities,
+    notes: "Followed in the IBD clinic.",
+    lastVisit: monthsAgo(i % 4),
     followUpStatus: ["Complete", "Due soon", "Overdue"][
       i % 3
     ] as Patient["followUpStatus"],
@@ -185,8 +134,9 @@ const drugs = [
 export const seedRecords: ClinicalRecords = {
   visits: seedPatients.flatMap((p, i) =>
     Array.from({ length: 2 + (i % 3) }, (_, n) => {
-      const heightM = 1.55 + (i % 20) / 100;
-      const weightKg = 52 + (i % 28);
+      const heightM =
+        p.gender === "Female" ? 1.48 + (i % 18) / 100 : 1.62 + (i % 20) / 100;
+      const weightKg = p.gender === "Female" ? 46 + (i % 22) : 58 + (i % 28);
       return {
         id: `${p.id}-V${String(n + 1).padStart(2, "0")}`,
         patientId: p.id,
@@ -208,6 +158,17 @@ export const seedRecords: ClinicalRecords = {
         admission: YES_NO[(i + n) % 3],
         montrealExtent: DISEASE_EXTENT[i % DISEASE_EXTENT.length],
         montrealSeverity: MONTREAL_SEVERITY[i % MONTREAL_SEVERITY.length],
+        diagnosisDate: p.diagnosisDate,
+        ageAtSymptomOnsetYears: p.ageAtSymptomOnsetYears,
+        illnessDurationMonths: p.illnessDurationMonths,
+        symptomOnsetToDiagnosisIntervalMonths:
+          p.symptomOnsetToDiagnosisIntervalMonths,
+        diseaseExtent: p.diseaseExtent,
+        severity: p.severity,
+        familyHistory: p.familyHistory,
+        diseaseStatus: p.status,
+        clinicalNotes:
+          n === 0 ? p.notes : "Disease information carried from baseline.",
         specialComment: n
           ? "Treatment reviewed; follow-up plan discussed."
           : "Baseline clinical assessment completed.",
@@ -380,39 +341,61 @@ export const seedRecords: ClinicalRecords = {
       impression: "No acute abnormality.",
       remarks: i % 2 === 0 ? "Repeat if symptoms worsen." : undefined,
     })),
-  pregnancies: seedPatients
-    .filter((p) => p.gender === "Female")
-    .filter((_, i) => i % 5 === 1)
-    .map((p, i) => ({
-      id: `PREG-${i}`,
-      patientId: p.id,
-      pregnancyNumber: 1,
-      pregnancyYear: 2022 + (i % 4),
-      pregnancyMonth: 3 + (i % 6),
-      durationWeeks: 38 + (i % 2),
-      activityAtConception: "Remission",
-      courseDuringPregnancy: "Remained in remission",
-      newUcComplication: "No",
-      pregnancyOutcome: "Normal delivery",
-      prematureDelivery: "No",
-      forcepsDelivery: "No",
-      infantBirthYear: 2022 + (i % 4),
-      infantBirthWeightKg: 2.8 + (i % 5) * 0.1,
-      congenitalMalformation: "No",
-      remarks: "Uneventful pregnancy course.",
-    })),
-  offspring: seedPatients.map((p, i) => ({
-    id: `OFF-${i}`,
-    patientId: p.id,
-    anyInfertility: i % 3 === 0 ? "Yes" : "No",
-    infertilityPeriodMonths: i % 3 === 0 ? 6 + (i % 12) : undefined,
-    totalOffspring: 1 + (i % 3),
-    offspringSinceIbdOnset: i % 2,
-    remarks:
-      p.gender === "Male"
-        ? "Offspring summary recorded at follow-up."
-        : "Includes offspring born before and after IBD diagnosis.",
-  })),
+  pregnancies: seedPatients.flatMap((p, i) => {
+    if (p.gender !== "Female" || p.children === 0) return [];
+    const count = p.children;
+    return Array.from({ length: count }, (_, n) => {
+      const year = 2008 + ((i * 2 + n * 3) % 16);
+      const premature = n === count - 1 && i % 5 === 0;
+      return {
+        id: `PREG-${p.id}-${n + 1}`,
+        patientId: p.id,
+        pregnancyNumber: n + 1,
+        pregnancyYear: year,
+        pregnancyMonth: 1 + ((i + n) % 12),
+        durationWeeks: premature ? 34 : 38,
+        activityAtConception: n % 2 ? "Partially active" : "Remission",
+        courseDuringPregnancy: n % 2
+          ? "Active at onset then entered remission"
+          : "Remained in remission",
+        newUcComplication: "No",
+        pregnancyOutcome: i % 7 === 0 && n === 0 ? "LSCS" : "Normal delivery",
+        prematureDelivery: premature ? "Yes" : "No",
+        forcepsDelivery: "No",
+        infantBirthYear: year,
+        infantBirthWeightKg: premature ? 2.1 : 2.7 + ((i + n) % 4) * 0.15,
+        congenitalMalformation: "No",
+        infantLowBirthWeight: premature ? "Yes" : "No",
+        remarks:
+          n === 0
+            ? "Antenatal IBD clinic follow-up."
+            : "Later pregnancy, planned.",
+      };
+    });
+  }),
+  offspring: seedPatients.map((p, i) =>
+    p.gender === "Female"
+      ? {
+          id: `OFF-${i}`,
+          patientId: p.id,
+          totalOffspring: p.children,
+          offspringSinceIbdOnset: Math.min(
+            p.children,
+            p.diseaseDurationYears > 8 ? 1 : 0,
+          ),
+          numberOfPregnancies: p.children,
+        }
+      : {
+          id: `OFF-${i}`,
+          patientId: p.id,
+          anyInfertility:
+            p.children === 0 && p.maritalStatus === "Married" ? "Yes" : "No",
+          infertilityPeriodMonths:
+            p.children === 0 && p.maritalStatus === "Married" ? 14 : undefined,
+          totalOffspring: p.children,
+          offspringSinceIbdOnset: Math.min(p.children, 1),
+        },
+  ),
   relapses: seedPatients
     .filter((_, i) => i % 4 === 2)
     .map((p, i) => ({
@@ -459,11 +442,11 @@ export const seedRecords: ClinicalRecords = {
       visitId: `${p.id}-V2`,
       date: monthsAgo(2 + i),
       pouchType: ["J Pouch", "S Pouch", "W Pouch"][i % 3],
-      daytimeContinence: "Mild",
+      daytimeContinence: "Yes",
       stoolFrequencyDay: 4 + (i % 3),
       stoolFrequencyNight: 1 + (i % 2),
       totalStoolFrequency: 5 + (i % 3),
-      nighttimeContinence: "None",
+      nighttimeContinence: "No",
       bloodInStool: "No",
       incontinence: "Mild",
       stoolFlatusDistinction: "Yes",
@@ -506,6 +489,24 @@ export const seedRecords: ClinicalRecords = {
           n === 0 ? "Patchy chronic changes" : "Minimal chronic inflammation",
       })),
     ),
+  courseOfDisease: seedPatients.map((p, i) => ({
+    id: `COD-${i}`,
+    patientId: p.id,
+    singleEpisodeProlongedRemission: i % 3 === 0 ? "Yes — 2 years" : "",
+    chronicContinuousActive: i % 3 === 1 ? "Ongoing" : "",
+    relapsingRemitting: i % 3 === 2 ? "Intermittent flares" : "",
+    severityIncreaseAfterLowActivity: i % 4 === 0 ? "After 1 year" : "",
+    fulminantEarlyColectomy: i % 5 === 0 ? "No" : "",
+    colectomyAtFirstRelapse: i % 4 === 0 ? "Yes" : "No",
+  })),
+  diseaseCategorization: seedPatients.map((p, i) => ({
+    id: `DCAT-${i}`,
+    patientId: p.id,
+    extentAtPresentation: EXTENT_AT_PRESENTATION[i % EXTENT_AT_PRESENTATION.length],
+    severityAtPresentation:
+      SEVERITY_AT_PRESENTATION[i % SEVERITY_AT_PRESENTATION.length],
+    ageAtPresentation: Math.max(12, p.ageAtDiagnosis - (i % 3)),
+  })),
   outcomes: seedPatients.map((p, i) => ({
     id: `OUT-${i}`,
     patientId: p.id,

@@ -9,6 +9,7 @@ export type LabRowState = {
   id: string;
   category: string;
   testName: string;
+  otherTestName: string;
   resultNumeric: string;
   resultText: string;
   unit: string;
@@ -54,6 +55,7 @@ export function emptyLabRow(category = "Hematology"): LabRowState {
     id: createLabRowId(),
     category,
     testName: "",
+    otherTestName: "",
     resultNumeric: "",
     resultText: "",
     unit: "",
@@ -87,6 +89,7 @@ export function buildLabFormStateFromRecords(
       id: record.id,
       category: record.category,
       testName: record.testName,
+      otherTestName: record.otherTestName ?? "",
       resultNumeric:
         record.resultNumeric !== undefined
           ? String(record.resultNumeric)
@@ -116,6 +119,10 @@ export function labFormToRecords(
     date: form.date,
     category: row.category,
     testName: row.testName,
+    otherTestName:
+      row.category === "Other" && row.testName === "Other"
+        ? row.otherTestName.trim() || undefined
+        : undefined,
     resultNumeric: num(row.resultNumeric),
     resultText: row.resultText || undefined,
     unit: row.unit || undefined,

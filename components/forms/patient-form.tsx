@@ -11,7 +11,6 @@ import {
   Input,
   PageHeader,
   Select,
-  Textarea,
 } from "@/components/ui/core";
 import type { Patient } from "@/types/clinical";
 import { calculateKuppuswamy } from "@/lib/kuppuswamy";
@@ -26,7 +25,6 @@ import { getContinueSectionLabel } from "@/lib/clinical-workflow";
 const steps = [
   "Identification",
   "Contact & Socio Economic Status",
-  "Disease information",
   "Review",
 ];
 const initial = {
@@ -52,17 +50,6 @@ const initial = {
   education: "",
   monthlyFamilyIncome: "",
   diet: "Non-vegetarian",
-  diagnosisDate: "",
-  ageAtSymptomOnsetYears: "",
-  illnessDurationMonths: "",
-  symptomOnsetToDiagnosisIntervalMonths: "",
-  diseaseExtent: "Left-sided colitis",
-  severity: "Moderate",
-  familyHistory: "No",
-  smokingStatus: "Never",
-  status: "Active disease",
-  comorbidities: "",
-  notes: "",
   wageLossPerMonthRs: "",
   daysAbsentFromWorkPerMonth: "",
   treatmentCostPerMonthRs: "",
@@ -110,20 +97,6 @@ export function PatientForm({
   const age = birthDate
     ? Math.max(0, 2026 - birthDate.getFullYear() - (birthdayPassed ? 0 : 1))
     : 0;
-  const ageAtDiagnosis =
-    form.diagnosisDate && form.dateOfBirth
-      ? Math.max(
-          0,
-          new Date(form.diagnosisDate).getFullYear() -
-            new Date(form.dateOfBirth).getFullYear(),
-        )
-      : 0;
-  const duration = form.diagnosisDate
-    ? Math.max(
-        0,
-        new Date().getFullYear() - new Date(form.diagnosisDate).getFullYear(),
-      )
-    : 0;
   const set = (key: keyof typeof form, value: string) => {
     setForm((f) => ({ ...f, [key]: value }));
     setErrors((e) => ({ ...e, [key]: "" }));
@@ -155,28 +128,11 @@ export function PatientForm({
       if (!form.monthlyFamilyIncome)
         next.monthlyFamilyIncome = "Select a monthly income range.";
     }
-    if (step === 2) {
-      if (!form.diagnosisDate)
-        next.diagnosisDate = "Diagnosis date is required.";
-      else if (
-        form.dateOfBirth &&
-        new Date(form.diagnosisDate) < new Date(form.dateOfBirth)
-      )
-        next.diagnosisDate = "Diagnosis cannot precede birth.";
-      if (
-        form.ageAtSymptomOnsetYears &&
-        ageAtDiagnosis &&
-        Number(form.ageAtSymptomOnsetYears) > ageAtDiagnosis
-      ) {
-        next.ageAtSymptomOnsetYears =
-          "Symptom onset age cannot exceed age at diagnosis.";
-      }
-    }
     setErrors(next);
     return Object.keys(next).length === 0;
   };
   const next = () => {
-    if (validate()) setStep((s) => Math.min(3, s + 1));
+    if (validate()) setStep((s) => Math.min(2, s + 1));
   };
   const submit = (andContinue = false) => {
     const patient: Patient = {
@@ -210,29 +166,16 @@ export function PatientForm({
       monthlyFamilyIncome: form.monthlyFamilyIncome,
       kuppuswamyScore: kuppuswamy.totalScore,
       socioeconomicCategory: kuppuswamy.socioeconomicCategory,
-      diagnosisDate: form.diagnosisDate,
-      ageAtDiagnosis,
-      diseaseDurationYears: duration,
-      ageAtSymptomOnsetYears: form.ageAtSymptomOnsetYears
-        ? Number(form.ageAtSymptomOnsetYears)
-        : undefined,
-      illnessDurationMonths: form.illnessDurationMonths
-        ? Number(form.illnessDurationMonths)
-        : undefined,
-      symptomOnsetToDiagnosisIntervalMonths:
-        form.symptomOnsetToDiagnosisIntervalMonths
-          ? Number(form.symptomOnsetToDiagnosisIntervalMonths)
-          : undefined,
-      diseaseExtent: form.diseaseExtent as Patient["diseaseExtent"],
-      severity: form.severity as Patient["severity"],
-      familyHistory: form.familyHistory === "Yes",
-      smokingStatus: form.smokingStatus as Patient["smokingStatus"],
-      status: form.status as Patient["status"],
-      comorbidities: form.comorbidities
-        .split(",")
-        .map((v) => v.trim())
-        .filter(Boolean),
-      notes: form.notes,
+      diagnosisDate: "",
+      ageAtDiagnosis: 0,
+      diseaseDurationYears: 0,
+      diseaseExtent: "Left-sided colitis",
+      severity: "Moderate",
+      familyHistory: false,
+      smokingStatus: "Never",
+      status: "Active disease",
+      comorbidities: [],
+      notes: "",
       lastVisit: form.registrationDate,
       followUpStatus: "Due soon",
     };
@@ -283,9 +226,9 @@ export function PatientForm({
       <PageHeader
         eyebrow="Patient registry"
         title="Add new patient"
-        description="Fields follow the identification, socioeconomic and disease sections in the reference workbook."
+        description="Identification and socioeconomic details. Disease information is recorded on the visit."
       />
-      <div className="mb-6 grid grid-cols-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="mb-6 grid grid-cols-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {steps.map((label, i) => (
           <div
             key={label}
@@ -453,79 +396,6 @@ export function PatientForm({
         )}
         {step === 2 && (
           <div>
-            <h2 className="mb-5 text-lg font-bold">Disease information</h2>
-            <div className="mb-8 space-y-4 rounded-xl border border-slate-200 bg-slate-50/40 p-5">
-              <h3 className="text-sm font-bold text-slate-800">
-                Clinical details
-              </h3>
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {input(
-                  "ageAtSymptomOnsetYears",
-                  "Age at Symptom Onset (Years)",
-                  false,
-                  "number",
-                )}
-                {input(
-                  "illnessDurationMonths",
-                  "Duration of Illness (Months)",
-                  false,
-                  "number",
-                )}
-                {input(
-                  "symptomOnsetToDiagnosisIntervalMonths",
-                  "Interval Between Onset of Symptoms and Diagnosis (Months)",
-                  false,
-                  "number",
-                )}
-              </div>
-            </div>
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {input("diagnosisDate", "Date of diagnosis", true, "date")}
-              <Field label="Age at diagnosis">
-                <Input value={ageAtDiagnosis || ""} disabled />
-              </Field>
-              <Field label="Disease duration">
-                <Input value={`${duration} years`} disabled />
-              </Field>
-              {select(
-                "diseaseExtent",
-                "Disease extent",
-                ["Proctitis", "Left-sided colitis", "Pancolitis"],
-                true,
-              )}
-              {select(
-                "severity",
-                "Disease severity",
-                ["Mild", "Moderate", "Severe"],
-                true,
-              )}
-              {select("familyHistory", "Family history", ["No", "Yes"])}
-              {select("smokingStatus", "Smoking status", [
-                "Never",
-                "Ex-smoker",
-                "Current",
-              ])}
-              {select("status", "Current disease status", [
-                "Remission",
-                "Active disease",
-                "Relapse",
-                "Post-surgery",
-              ])}
-              {input("comorbidities", "Relevant comorbidities")}
-            </div>
-            <div className="mt-5">
-              <Field label="Clinical notes">
-                <Textarea
-                  value={form.notes}
-                  onChange={(e) => set("notes", e.target.value)}
-                  placeholder="Relevant synthetic clinical context…"
-                />
-              </Field>
-            </div>
-          </div>
-        )}
-        {step === 3 && (
-          <div>
             <h2 className="mb-1 text-lg font-bold">Review patient record</h2>
             <p className="mb-6 text-sm text-slate-500">
               Confirm the synthetic record before adding it to local demo data.
@@ -548,28 +418,6 @@ export function PatientForm({
                     : "Pending",
                 ],
                 ["Registered", form.registrationDate],
-                ["Diagnosis", form.diagnosisDate],
-                [
-                  "Age at symptom onset",
-                  form.ageAtSymptomOnsetYears || "Not recorded",
-                ],
-                [
-                  "Duration of illness",
-                  form.illnessDurationMonths
-                    ? `${form.illnessDurationMonths} months`
-                    : "Not recorded",
-                ],
-                [
-                  "Onset to diagnosis interval",
-                  form.symptomOnsetToDiagnosisIntervalMonths
-                    ? `${form.symptomOnsetToDiagnosisIntervalMonths} months`
-                    : "Not recorded",
-                ],
-                ["Extent", form.diseaseExtent],
-                ["Severity", form.severity],
-                ["Status", form.status],
-                ["Smoking", form.smokingStatus],
-                ["Comorbidities", form.comorbidities || "None recorded"],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg bg-slate-50 p-4">
                   <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
@@ -609,7 +457,7 @@ export function PatientForm({
                 Previous
               </Button>
             )}
-            {step < 3 ? (
+            {step < 2 ? (
               <Button onClick={next}>
                 Next
                 <ChevronRight className="size-4" />

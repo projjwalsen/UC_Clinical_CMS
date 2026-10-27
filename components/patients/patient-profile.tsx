@@ -35,6 +35,8 @@ import type {
   MedicationRecord,
   PregnancyRecord,
   OffspringRecord,
+  CourseOfDiseaseRecord,
+  DiseaseCategorizationRecord,
   RelapseRecord,
   IPAARecord,
   PouchoscopyRecord,
@@ -59,11 +61,16 @@ import { ImagingForm } from "@/components/forms/imaging-form";
 import { MedicationForm } from "@/components/forms/medication-form";
 import { PregnancyForm } from "@/components/forms/pregnancy-form";
 import { OffspringForm } from "@/components/forms/offspring-form";
+import { CourseOfDiseaseForm } from "@/components/forms/course-of-disease-form";
+import { DiseaseCategorizationForm } from "@/components/forms/disease-categorization-form";
 import { RelapseForm } from "@/components/forms/relapse-form";
 import { SurgeryForm } from "@/components/forms/surgery-form";
 import { IpaaForm } from "@/components/forms/ipaa-form";
 import { PouchoscopyForm } from "@/components/forms/pouchoscopy-form";
-import { getLastVisit } from "@/lib/visit-utils";
+import {
+  applyVisitDiseaseToPatient,
+  getLastVisit,
+} from "@/lib/visit-utils";
 import { formatPresent, getLastSymptomAssessment } from "@/lib/symptom-utils";
 import { formatEimPresent, getLastEimAssessment } from "@/lib/eim-utils";
 import {
@@ -81,7 +88,10 @@ import {
   pregnancyRemarks,
   pregnancyYear,
 } from "@/lib/pregnancy-utils";
-import { getLastOffspring } from "@/lib/offspring-utils";
+import {
+  getLastOffspring,
+  offspringTabLabel,
+} from "@/lib/offspring-utils";
 import {
   relapseAdmission,
   relapseCauseLabel,
@@ -98,7 +108,6 @@ import { PatientEditForm } from "@/components/forms/patient-edit-form";
 import { getPatientDisplayPhone } from "@/lib/patient-contact";
 import {
   formatLabResult,
-  labAbnormalFlag,
   labNumericValue,
 } from "@/lib/lab-utils";
 import {
@@ -113,6 +122,8 @@ const tabsBeforeReproductive: [string, keyof ClinicalRecords | "overview"][] = [
   ["Visit & Epidemiological", "visits"],
   ["Clinical Features", "symptoms"],
   ["Extra-intestinal manifestations", "eims"],
+  ["Course of Disease", "courseOfDisease"],
+  ["Disease Categorization", "diseaseCategorization"],
   ["Offspring", "offspring"],
   ["Lab Investigations", "labs"],
   ["Colonoscopy and endoscopic", "endoscopies"],
@@ -138,6 +149,8 @@ type DrawerPrefill = {
   ipaa?: IPAARecord;
   pouchoscopy?: PouchoscopyRecord;
   offspring?: OffspringRecord;
+  courseOfDisease?: CourseOfDiseaseRecord;
+  diseaseCategorization?: DiseaseCategorizationRecord;
   pregnancyRecords?: PregnancyRecord[];
   surgery?: SurgeryRecord;
 };
@@ -264,6 +277,10 @@ export function PatientProfile({
         : [],
     [patient, related, clinicalDatasetRecords],
   );
+  const lastOffspring = useMemo(
+    () => getLastOffspring(related.offspring as OffspringRecord[]),
+    [related.offspring],
+  );
   if (!patient)
     return (
       <EmptyState
@@ -274,23 +291,29 @@ export function PatientProfile({
 
   const isFemalePatient = patient.gender === "Female";
   const profileTabs = useMemo(
-    (): [string, keyof ClinicalRecords | "overview" | "clinical-dataset"][] => [
-      ...tabsBeforeReproductive.filter(
-        ([, key]) => POUCHOSCOPY_SECTION_ENABLED || key !== "pouchoscopies",
-      ),
-      ...(isFemalePatient
-        ? ([["Pregnancy", "pregnancies"]] as [
+    (): [string, keyof ClinicalRecords | "overview" | "clinical-dataset"][] => {
+      const base = tabsBeforeReproductive
+        .filter(
+          ([, key]) =>
+            POUCHOSCOPY_SECTION_ENABLED || key !== "pouchoscopies",
+        )
+        .map(
+          ([label, key]): [
             string,
             keyof ClinicalRecords | "overview" | "clinical-dataset",
-          ][])
-        : []),
-      ...tabsAfterReproductive,
-    ],
-    [isFemalePatient],
-  );
-  const lastOffspring = useMemo(
-    () => getLastOffspring(related.offspring as OffspringRecord[]),
-    [related.offspring],
+          ] => {
+            if (key === "offspring" && isFemalePatient) {
+              return ["Pregnancy & offspring", "pregnancies"];
+            }
+            if (key === "offspring") {
+              return [offspringTabLabel(patient.gender), key];
+            }
+            return [label, key];
+          },
+        );
+      return [...base, ...tabsAfterReproductive];
+    },
+    [isFemalePatient, patient.gender],
   );
   const labHb = related.labs.find(
     (l) => l.testName === "Hb" || l.testName === "Haemoglobin",
@@ -321,6 +344,8 @@ export function PatientProfile({
       drawer === "visits" ||
       drawer === "symptoms" ||
       drawer === "eims" ||
+      drawer === "courseOfDisease" ||
+      drawer === "diseaseCategorization" ||
       drawer === "labs" ||
       drawer === "endoscopies" ||
       drawer === "histopathology" ||
@@ -370,6 +395,11 @@ export function PatientProfile({
     const exists = records.visits.some((v) => v.id === visit.id);
     if (exists) updateRecord("visits", visit);
     else addRecord("visits", visit);
+    const others = (related.visits as Visit[]).filter((v) => v.id !== visit.id);
+    const isLatest = others.every((v) => visit.date >= v.date);
+    if (patient && isLatest && visit.diagnosisDate) {
+      updatePatient(applyVisitDiseaseToPatient(patient, visit));
+    }
     toast.success(exists ? "Visit updated" : "Visit added");
     finishSectionSave("visits", andContinue);
   };
@@ -377,6 +407,32 @@ export function PatientProfile({
     upsertVisitContextBatch("symptoms", symptomRecords);
     toast.success("Symptom assessment saved");
     finishSectionSave("symptoms", andContinue);
+  };
+  const saveCourseOfDisease = (
+    record: CourseOfDiseaseRecord,
+    andContinue = false,
+  ) => {
+    const exists = records.courseOfDisease.some((r) => r.id === record.id);
+    if (exists) updateRecord("courseOfDisease", record);
+    else addRecord("courseOfDisease", record);
+    toast.success(
+      exists ? "Course of disease updated" : "Course of disease saved",
+    );
+    finishSectionSave("courseOfDisease", andContinue);
+  };
+  const saveDiseaseCategorization = (
+    record: DiseaseCategorizationRecord,
+    andContinue = false,
+  ) => {
+    const exists = records.diseaseCategorization.some((r) => r.id === record.id);
+    if (exists) updateRecord("diseaseCategorization", record);
+    else addRecord("diseaseCategorization", record);
+    toast.success(
+      exists
+        ? "Disease categorization updated"
+        : "Disease categorization saved",
+    );
+    finishSectionSave("diseaseCategorization", andContinue);
   };
   const saveEims = (eimRecords: EIMRecord[], andContinue = false) => {
     upsertVisitContextBatch("eims", eimRecords);
@@ -426,17 +482,28 @@ export function PatientProfile({
   const savePregnancy = (
     pregnancyRecords: PregnancyRecord[],
     andContinue = false,
+    mother?: OffspringRecord,
   ) => {
+    if (mother) {
+      const exists = records.offspring.some((r) => r.id === mother.id);
+      if (exists) updateRecord("offspring", mother);
+      else addRecord("offspring", mother);
+    }
+    const savedIds = new Set(pregnancyRecords.map((record) => record.id));
+    if (mother) {
+      records.pregnancies
+        .filter(
+          (record) =>
+            record.patientId === patientId && !savedIds.has(record.id),
+        )
+        .forEach((record) => deleteRecord("pregnancies", record.id));
+    }
     pregnancyRecords.forEach((record) => {
       const exists = records.pregnancies.some((r) => r.id === record.id);
       if (exists) updateRecord("pregnancies", record);
       else addRecord("pregnancies", record);
     });
-    toast.success(
-      pregnancyRecords.length === 1
-        ? "Pregnancy record saved"
-        : "Pregnancy records saved",
-    );
+    toast.success("Pregnancy and offspring saved");
     finishSectionSave("pregnancies", andContinue);
   };
   const saveOffspring = (offspringRecord: OffspringRecord, andContinue = false) => {
@@ -555,7 +622,6 @@ export function PatientProfile({
     ["Category", "category"],
     ["Test", "testName"],
     ["Result", "result"],
-    ["Flag", "abnormalFlag"],
   ];
   const medicationColumns: [
     string,
@@ -613,13 +679,34 @@ export function PatientProfile({
     ["Outcome", "outcomeDisplay"],
     ["Remarks", "remarksDisplay"],
   ];
-  const offspringColumns: [string, keyof OffspringRecord][] = [
-    ["Infertility", "anyInfertility"],
-    ["Period (mo)", "infertilityPeriodMonths"],
-    ["Total offspring", "totalOffspring"],
-    ["Since IBD onset", "offspringSinceIbdOnset"],
-    ["Remarks", "remarks"],
+  const courseColumns: [string, keyof CourseOfDiseaseRecord][] = [
+    ["Single episode", "singleEpisodeProlongedRemission"],
+    ["Chronic continuous", "chronicContinuousActive"],
+    ["Relapsing-remitting", "relapsingRemitting"],
+    ["Severity increase", "severityIncreaseAfterLowActivity"],
+    ["Fulminant course", "fulminantEarlyColectomy"],
+    ["Colectomy at first relapse", "colectomyAtFirstRelapse"],
   ];
+  const categorizationColumns: [string, keyof DiseaseCategorizationRecord][] = [
+    ["Extent at presentation", "extentAtPresentation"],
+    ["Severity at presentation", "severityAtPresentation"],
+    ["Age at presentation", "ageAtPresentation"],
+  ];
+  const offspringColumns: [string, keyof OffspringRecord][] =
+    isFemalePatient
+      ? [
+          ["Total offspring", "totalOffspring"],
+          ["After disease onset", "offspringSinceIbdOnset"],
+          ["Pregnancies", "numberOfPregnancies"],
+          ["Remarks", "remarks"],
+        ]
+      : [
+          ["Infertility", "anyInfertility"],
+          ["Period (mo)", "infertilityPeriodMonths"],
+          ["Total offspring", "totalOffspring"],
+          ["Since IBD onset", "offspringSinceIbdOnset"],
+          ["Remarks", "remarks"],
+        ];
   const relapseColumns: [
     string,
     keyof RelapseRecord | "causeDisplay" | "outcomeDisplay" | "admissionDisplay",
@@ -868,9 +955,13 @@ export function PatientProfile({
                     {tab === "clinical-dataset"
                       ? "Linked clinical dataset record used by the cohort report (demographics from this profile)."
                       : tab === "pregnancies"
-                        ? "Pregnancy summaries. Not linked to a visit."
+                        ? "Mother summary and each pregnancy. Not linked to a visit."
+                        : tab === "courseOfDisease"
+                          ? "Baseline course pattern. Not linked to a visit."
+                          : tab === "diseaseCategorization"
+                            ? "Extent, severity, and age at presentation. Not linked to a visit."
                         : tab === "offspring"
-                        ? "Offspring summary. Not linked to a visit."
+                          ? "Male offspring summary. Not linked to a visit."
                         : "Longitudinal observations linked by patient and visit ID."}
                   </p>
                 </div>
@@ -880,7 +971,15 @@ export function PatientProfile({
                     onClick={() => setDrawer("pregnancies")}
                   >
                     <Plus className="size-4" />
-                    Add pregnancy
+                    Add record
+                  </Button>
+                ) : tab === "courseOfDisease" || tab === "diseaseCategorization" ? (
+                  <Button
+                    size="sm"
+                    onClick={() => openAddDrawer(tab)}
+                  >
+                    <Plus className="size-4" />
+                    Add record
                   </Button>
                 ) : tab === "offspring" ? (
                   <Button size="sm" onClick={() => setDrawer("offspring")}>
@@ -900,12 +999,41 @@ export function PatientProfile({
               {tab === "clinical-dataset" ? (
                 <ClinicalDatasetPatientTab patient={patient} />
               ) : tab === "pregnancies" ? (
-                !related.pregnancies.length ? (
+                !related.pregnancies.length && !related.offspring.length ? (
                   <EmptyState
-                    title="No pregnancy records"
-                    description="Add a pregnancy record for this patient."
+                    title="No pregnancy or offspring record"
+                    description="Add the mother summary and pregnancy details for this patient."
                   />
                 ) : (
+                  <div className="space-y-6">
+                    {lastOffspring && (
+                      <dl className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-3">
+                        {[
+                          ["Total offspring", lastOffspring.totalOffspring],
+                          [
+                            "After disease onset",
+                            lastOffspring.offspringSinceIbdOnset,
+                          ],
+                          ["Pregnancies", lastOffspring.numberOfPregnancies],
+                        ].map(([label, value]) => (
+                          <div key={String(label)}>
+                            <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                              {label}
+                            </dt>
+                            <dd className="mt-1 font-semibold text-slate-800">
+                              {value === undefined || value === ""
+                                ? "—"
+                                : String(value)}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    )}
+                    {!related.pregnancies.length ? (
+                      <p className="text-sm text-slate-500">
+                        No pregnancy rows yet.
+                      </p>
+                    ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                       <thead className="bg-slate-50 text-[11px] uppercase text-slate-500">
@@ -949,6 +1077,107 @@ export function PatientProfile({
                             </tr>
                           ),
                         )}
+                      </tbody>
+                    </table>
+                  </div>
+                    )}
+                  </div>
+                )
+              ) : tab === "courseOfDisease" ? (
+                !related.courseOfDisease.length ? (
+                  <EmptyState
+                    title="No course of disease record"
+                    description="Record the disease course pattern for this patient."
+                  />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 text-[11px] uppercase text-slate-500">
+                        <tr>
+                          {courseColumns.map(([label]) => (
+                            <th key={label} className="px-4 py-3">
+                              {label}
+                            </th>
+                          ))}
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {related.courseOfDisease.map((row) => (
+                          <tr key={row.id} className="border-t border-slate-100">
+                            {courseColumns.map(([label, key]) => (
+                              <td
+                                key={label}
+                                className="max-w-56 px-4 py-3 text-slate-600"
+                              >
+                                {String(row[key] || "—")}
+                              </td>
+                            ))}
+                            <td className="px-4 py-3 text-right">
+                              <RecordRowActions
+                                onEdit={() => {
+                                  setDrawerPrefill({ courseOfDisease: row });
+                                  setDrawer("courseOfDisease");
+                                }}
+                                onDelete={() =>
+                                  handleDeleteRecord("courseOfDisease", row.id)
+                                }
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              ) : tab === "diseaseCategorization" ? (
+                !related.diseaseCategorization.length ? (
+                  <EmptyState
+                    title="No disease categorization"
+                    description="Record extent, severity, and age at presentation."
+                  />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 text-[11px] uppercase text-slate-500">
+                        <tr>
+                          {categorizationColumns.map(([label]) => (
+                            <th key={label} className="px-4 py-3">
+                              {label}
+                            </th>
+                          ))}
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {related.diseaseCategorization.map((row) => (
+                          <tr key={row.id} className="border-t border-slate-100">
+                            {categorizationColumns.map(([label, key]) => (
+                              <td
+                                key={label}
+                                className="max-w-56 px-4 py-3 text-slate-600"
+                              >
+                                {String(row[key] ?? "—")}
+                              </td>
+                            ))}
+                            <td className="px-4 py-3 text-right">
+                              <RecordRowActions
+                                onEdit={() => {
+                                  setDrawerPrefill({
+                                    diseaseCategorization: row,
+                                  });
+                                  setDrawer("diseaseCategorization");
+                                }}
+                                onDelete={() =>
+                                  handleDeleteRecord(
+                                    "diseaseCategorization",
+                                    row.id,
+                                  )
+                                }
+                              />
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
@@ -1266,10 +1495,10 @@ export function PatientProfile({
                             >
                               {key === "date"
                                 ? formatDate(row.date)
-                                : key === "result"
-                                  ? formatLabResult(row)
-                                  : key === "abnormalFlag"
-                                    ? labAbnormalFlag(row) ?? "—"
+                                : key === "testName"
+                                  ? row.otherTestName?.trim() || row.testName
+                                  : key === "result"
+                                    ? formatLabResult(row)
                                     : String(row[key as keyof LaboratoryResult] ?? "—")}
                             </td>
                           ))}
@@ -1562,7 +1791,7 @@ export function PatientProfile({
           }}
         >
           <aside
-            className={`absolute right-0 top-0 h-full w-full overflow-y-auto bg-white shadow-2xl ${drawer === "visits" || drawer === "pregnancies" || drawer === "relapses" || drawer === "surgeries" || drawer === "ipaa" || drawer === "pouchoscopies" || drawer === "endoscopies" ? "max-w-3xl" : drawer === "symptoms" || drawer === "eims" || drawer === "labs" || drawer === "histopathology" || drawer === "medications" ? "max-w-5xl" : drawer === "imaging" || drawer === "offspring" ? "max-w-2xl" : "max-w-lg"}`}
+            className={`absolute right-0 top-0 h-full w-full overflow-y-auto bg-white shadow-2xl ${drawer === "visits" || drawer === "pregnancies" || drawer === "relapses" || drawer === "surgeries" || drawer === "ipaa" || drawer === "pouchoscopies" || drawer === "endoscopies" ? "max-w-3xl" : drawer === "symptoms" || drawer === "eims" || drawer === "labs" || drawer === "histopathology" || drawer === "medications" ? "max-w-5xl" : drawer === "imaging" || drawer === "offspring" || drawer === "courseOfDisease" || drawer === "diseaseCategorization" ? "max-w-2xl" : "max-w-lg"}`}
           >
             {drawer === "visits" ? (
               <>
@@ -1583,6 +1812,7 @@ export function PatientProfile({
                 </div>
                 <VisitForm
                   patientId={patientId}
+                  patient={patient}
                   visitCount={related.visits.length}
                   patientVisits={related.visits as Visit[]}
                   editingVisit={drawerPrefill?.visit ?? null}
@@ -1788,9 +2018,9 @@ export function PatientProfile({
                 <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white p-5">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wide text-teal-700">
-                      Pregnancy and birth outcomes
+                      Pregnancy & offspring
                     </p>
-                    <h2 className="text-lg font-bold">Add pregnancy</h2>
+                    <h2 className="text-lg font-bold">Pregnancy & offspring</h2>
                   </div>
                   <Button
                     variant="ghost"
@@ -1803,10 +2033,73 @@ export function PatientProfile({
                 <PregnancyForm
                   patientId={patientId}
                   existingRecords={related.pregnancies as PregnancyRecord[]}
+                  motherRecord={lastOffspring}
                   onCancel={() => closeDrawer()}
-                  onSave={(r) => savePregnancy(r, false)}
-                  onSaveAndContinue={(r) => savePregnancy(r, true)}
+                  onSave={(records, mother) =>
+                    savePregnancy(records, false, mother)
+                  }
+                  onSaveAndContinue={(records, mother) =>
+                    savePregnancy(records, true, mother)
+                  }
                   continueHint={getContinueSectionLabel("pregnancies")}
+                />
+              </>
+            ) : drawer === "courseOfDisease" ? (
+              <>
+                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white p-5">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-teal-700">
+                      Course of Disease
+                    </p>
+                    <h2 className="text-lg font-bold">
+                      {drawerPrefill?.courseOfDisease ? "Edit" : "Add"} course of
+                      disease
+                    </h2>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    onClick={() => closeDrawer()}
+                    aria-label="Close"
+                  >
+                    <X className="size-5" />
+                  </Button>
+                </div>
+                <CourseOfDiseaseForm
+                  patientId={patientId}
+                  editingRecord={drawerPrefill?.courseOfDisease ?? null}
+                  onCancel={() => closeDrawer()}
+                  onSave={(r) => saveCourseOfDisease(r, false)}
+                  onSaveAndContinue={(r) => saveCourseOfDisease(r, true)}
+                  continueHint={getContinueSectionLabel("courseOfDisease")}
+                />
+              </>
+            ) : drawer === "diseaseCategorization" ? (
+              <>
+                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white p-5">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-teal-700">
+                      Disease Categorization
+                    </p>
+                    <h2 className="text-lg font-bold">
+                      {drawerPrefill?.diseaseCategorization ? "Edit" : "Add"}{" "}
+                      disease categorization
+                    </h2>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    onClick={() => closeDrawer()}
+                    aria-label="Close"
+                  >
+                    <X className="size-5" />
+                  </Button>
+                </div>
+                <DiseaseCategorizationForm
+                  patientId={patientId}
+                  editingRecord={drawerPrefill?.diseaseCategorization ?? null}
+                  onCancel={() => closeDrawer()}
+                  onSave={(r) => saveDiseaseCategorization(r, false)}
+                  onSaveAndContinue={(r) => saveDiseaseCategorization(r, true)}
+                  continueHint={getContinueSectionLabel("diseaseCategorization")}
                 />
               </>
             ) : drawer === "offspring" ? (
@@ -1814,9 +2107,11 @@ export function PatientProfile({
                 <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white p-5">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wide text-teal-700">
-                      Offspring summary
+                      {offspringTabLabel(patient.gender)}
                     </p>
-                    <h2 className="text-lg font-bold">Add offspring</h2>
+                    <h2 className="text-lg font-bold">
+                      Add {offspringTabLabel(patient.gender).toLowerCase()}
+                    </h2>
                   </div>
                   <Button
                     variant="ghost"
@@ -1828,7 +2123,9 @@ export function PatientProfile({
                 </div>
                 <OffspringForm
                   patientId={patientId}
-                  lastRecord={lastOffspring}
+                  patientGender={patient.gender}
+                  seedRecord={lastOffspring}
+                  editingRecord={drawerPrefill?.offspring ?? null}
                   onCancel={() => closeDrawer()}
                   onSave={(r) => saveOffspring(r, false)}
                   onSaveAndContinue={(r) => saveOffspring(r, true)}

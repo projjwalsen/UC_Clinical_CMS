@@ -1,12 +1,18 @@
 "use client";
 
-import { Database, RotateCcw, ShieldCheck } from "lucide-react";
+import { Database, RotateCcw, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useDemoStore } from "@/lib/demo-store";
 import { Badge, Button, Card, PageHeader, Select } from "@/components/ui/core";
 
 export function SettingsPage() {
-  const { reset, patients, reports } = useDemoStore();
+  const {
+    reset,
+    patients,
+    reports,
+    preferences,
+    setClinicalAssistantEnabled,
+  } = useDemoStore();
   return (
     <div>
       <PageHeader
@@ -70,6 +76,48 @@ export function SettingsPage() {
               <label className="mt-4 flex items-center gap-3 text-sm text-slate-600">
                 <input type="checkbox" defaultChecked />
                 Show synthetic-data notices
+              </label>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-6">
+          <div className="flex items-start gap-4">
+            <span className="rounded-xl bg-violet-50 p-3 text-violet-700">
+              <Sparkles />
+            </span>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-bold">Clinical Assistant</h2>
+                <Badge tone="blue">Preview</Badge>
+              </div>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                Show a navigation item and preview screen for future AI Q&amp;A
+                and custom PDF/Excel reports over inserted clinical data. No
+                model or server is connected in this prototype.
+              </p>
+              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/80 p-4">
+                <input
+                  type="checkbox"
+                  className="mt-1 size-4 accent-teal-700"
+                  checked={preferences.clinicalAssistantEnabled}
+                  onChange={(e) => {
+                    setClinicalAssistantEnabled(e.target.checked);
+                    toast.success(
+                      e.target.checked
+                        ? "Clinical Assistant shown in sidebar"
+                        : "Clinical Assistant hidden",
+                    );
+                  }}
+                />
+                <span>
+                  <span className="text-sm font-semibold text-slate-800">
+                    Enable Clinical Assistant (preview UI)
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    Off by default. Turn on to demo the workspace label and
+                    layout before integrating a local LLM.
+                  </span>
+                </span>
               </label>
             </div>
           </div>

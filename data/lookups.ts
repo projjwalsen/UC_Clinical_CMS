@@ -99,6 +99,16 @@ export const RESCUE_OUTCOMES = [
 
 export const POUCH_TYPES = ["J Pouch", "S Pouch", "W Pouch", "Other"] as const;
 
+export const EXTENT_AT_PRESENTATION = [
+  "Proctitis",
+  "Proctosigmoiditis",
+  "Left-sided colitis",
+  "Extensive colitis",
+  "Pancolitis",
+] as const;
+
+export const SEVERITY_AT_PRESENTATION = ["Mild", "Moderate", "Severe"] as const;
+
 export const INCONTINENCE_LEVELS = [
   "None",
   "Mild",

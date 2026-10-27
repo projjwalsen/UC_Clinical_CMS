@@ -111,6 +111,16 @@ export interface Visit {
   specialComment?: string;
   montrealExtent?: string;
   montrealSeverity?: string;
+  /** Disease information captured on the visit (moved from add-patient). */
+  diagnosisDate?: string;
+  ageAtSymptomOnsetYears?: number;
+  illnessDurationMonths?: number;
+  symptomOnsetToDiagnosisIntervalMonths?: number;
+  diseaseExtent?: "Proctitis" | "Left-sided colitis" | "Pancolitis";
+  severity?: Severity;
+  familyHistory?: boolean;
+  diseaseStatus?: ClinicalStatus;
+  clinicalNotes?: string;
 }
 export interface SymptomRecord {
   id: string;
@@ -142,6 +152,8 @@ export interface LaboratoryResult {
   date: string;
   category: string;
   testName: string;
+  /** Free-text name when category and test are both Other. */
+  otherTestName?: string;
   resultNumeric?: number;
   resultText?: string;
   unit?: string;
@@ -251,10 +263,15 @@ export interface PregnancyRecord {
 export interface OffspringRecord {
   id: string;
   patientId: string;
+  /** Male offspring workbook fields */
   anyInfertility?: string;
   infertilityPeriodMonths?: number;
+  /** Shared summary counts */
   totalOffspring?: number;
+  /** Male: offspring since IBD onset; female: no. of children after disease onset */
   offspringSinceIbdOnset?: number;
+  /** Female offspring — mother summary */
+  numberOfPregnancies?: number;
   remarks?: string;
   /** @deprecated legacy per-child fields */
   birthYear?: number;
@@ -275,6 +292,8 @@ export interface RelapseRecord {
   ivSteroid?: string;
   infection?: string;
   infectionType?: string;
+  /** Free text shown after an infection type is selected. */
+  infectionTypeDetail?: string;
   rescueTherapy?: string;
   rescueTherapyType?: string;
   rescueTherapyFailure?: string;
@@ -360,6 +379,25 @@ export interface PouchoscopyRecord {
   /** @deprecated use scoreValue */
   score?: number;
 }
+export interface CourseOfDiseaseRecord {
+  id: string;
+  patientId: string;
+  singleEpisodeProlongedRemission?: string;
+  chronicContinuousActive?: string;
+  relapsingRemitting?: string;
+  severityIncreaseAfterLowActivity?: string;
+  fulminantEarlyColectomy?: string;
+  colectomyAtFirstRelapse?: string;
+}
+
+export interface DiseaseCategorizationRecord {
+  id: string;
+  patientId: string;
+  extentAtPresentation?: string;
+  severityAtPresentation?: string;
+  ageAtPresentation?: number;
+}
+
 export interface OutcomeRecord {
   id: string;
   patientId: string;
@@ -374,6 +412,8 @@ export interface ClinicalRecords {
   visits: Visit[];
   symptoms: SymptomRecord[];
   eims: EIMRecord[];
+  courseOfDisease: CourseOfDiseaseRecord[];
+  diseaseCategorization: DiseaseCategorizationRecord[];
   labs: LaboratoryResult[];
   medications: MedicationRecord[];
   endoscopies: EndoscopyRecord[];

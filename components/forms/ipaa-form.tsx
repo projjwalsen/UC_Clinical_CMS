@@ -149,8 +149,8 @@ export function IpaaForm({
                 onChange={(e) => update("daytimeContinence", e.target.value)}
               >
                 <option value="">Select</option>
-                {INCONTINENCE_LEVELS.map((level) => (
-                  <option key={level}>{level}</option>
+                {YES_NO_OPTIONS.map((value) => (
+                  <option key={value}>{value}</option>
                 ))}
               </Select>
             </Field>
@@ -161,8 +161,8 @@ export function IpaaForm({
                 onChange={(e) => update("nighttimeContinence", e.target.value)}
               >
                 <option value="">Select</option>
-                {INCONTINENCE_LEVELS.map((level) => (
-                  <option key={level}>{level}</option>
+                {YES_NO_OPTIONS.map((value) => (
+                  <option key={value}>{value}</option>
                 ))}
               </Select>
             </Field>

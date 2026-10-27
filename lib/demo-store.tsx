@@ -9,7 +9,14 @@ import type {
   ReportConfiguration,
 } from "@/types/clinical";
 import type { ClinicalDatasetRecord } from "@/types/clinical-report";
+import {
+  ASSISTANT_PREVIEW_REPLY,
+  chatTitleFromMessage,
+  createEmptyWorkspace,
+  seedAssistantWorkspace,
+} from "@/lib/clinical-assistant-utils";
 import { recordMatchesVisitContext } from "@/lib/record-visit-matching";
+import type { AssistantWorkspace } from "@/types/clinical-assistant";
 
 const KEYS = {
   patients: "uccms-demo-patients",
@@ -17,11 +24,60 @@ const KEYS = {
   reports: "uccms-demo-reports",
   clinicalDataset: "uccms-demo-clinical-dataset",
   auth: "uccms-demo-auth",
+  preferences: "uccms-demo-preferences",
+  assistant: "uccms-demo-assistant",
+  dataVersion: "uccms-demo-data-version",
 };
+
+/** Bump when the seeded cohort should replace anything already saved in the browser. */
+const DEMO_DATA_VERSION = "2026-10-27-bengali-20";
+
+function readAssistantWorkspace(): AssistantWorkspace {
+  try {
+    const raw = localStorage.getItem(KEYS.assistant);
+    if (!raw) return seedAssistantWorkspace();
+    return JSON.parse(raw) as AssistantWorkspace;
+  } catch {
+    return seedAssistantWorkspace();
+  }
+}
+
+export type DemoPreferences = {
+  /** Shows Clinical Assistant nav + preview UI (no model connected in demo). */
+  clinicalAssistantEnabled: boolean;
+};
+
+const DEFAULT_PREFERENCES: DemoPreferences = {
+  clinicalAssistantEnabled: false,
+};
+
+function readPreferences(): DemoPreferences {
+  try {
+    const raw = localStorage.getItem(KEYS.preferences);
+    if (!raw) return DEFAULT_PREFERENCES;
+    const parsed = JSON.parse(raw) as Partial<DemoPreferences>;
+    return {
+      ...DEFAULT_PREFERENCES,
+      ...parsed,
+    };
+  } catch {
+    return DEFAULT_PREFERENCES;
+  }
+}
 
 interface DemoStore {
   ready: boolean;
   authenticated: boolean;
+  preferences: DemoPreferences;
+  setClinicalAssistantEnabled: (enabled: boolean) => void;
+  assistant: AssistantWorkspace;
+  newAssistantChat: () => void;
+  selectAssistantChat: (chatId: string | null) => void;
+  deleteAssistantChat: (chatId: string) => void;
+  togglePinAssistantChat: (chatId: string) => void;
+  sendAssistantMessage: (content: string) => void;
+  deleteAssistantReport: (reportId: string) => void;
+  togglePinAssistantReport: (reportId: string) => void;
   patients: Patient[];
   records: ClinicalRecords;
   reports: ReportConfiguration[];
@@ -71,34 +127,55 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
   const [clinicalDatasetRecords, setClinicalDatasetRecords] = useState<
     ClinicalDatasetRecord[]
   >(seedClinicalDatasetRecords);
+  const [preferences, setPreferences] =
+    useState<DemoPreferences>(DEFAULT_PREFERENCES);
+  const [assistant, setAssistant] = useState<AssistantWorkspace>(
+    createEmptyWorkspace,
+  );
 
   useEffect(() => {
     try {
-      const p = localStorage.getItem(KEYS.patients);
-      const r = localStorage.getItem(KEYS.records);
-      const saved = localStorage.getItem(KEYS.reports);
-      const clinical = localStorage.getItem(KEYS.clinicalDataset);
-      if (p) {
-        const parsed = JSON.parse(p) as Patient[];
-        setPatients(
-          parsed.map((patient) => {
-            const seed = seedPatients.find((s) => s.id === patient.id);
-            return {
-              ...patient,
-              ibdCode: patient.ibdCode ?? seed?.ibdCode,
-              country: patient.country ?? seed?.country ?? "India",
-              defaultPhoneContact: patient.defaultPhoneContact ?? "primary",
-            };
-          }),
-        );
+      const freshCohort =
+        localStorage.getItem(KEYS.dataVersion) !== DEMO_DATA_VERSION;
+      if (freshCohort) {
+        localStorage.removeItem(KEYS.patients);
+        localStorage.removeItem(KEYS.records);
+        localStorage.removeItem(KEYS.clinicalDataset);
+        localStorage.removeItem(KEYS.assistant);
+        localStorage.setItem(KEYS.dataVersion, DEMO_DATA_VERSION);
+        setAssistant(seedAssistantWorkspace());
+      } else {
+        const p = localStorage.getItem(KEYS.patients);
+        const r = localStorage.getItem(KEYS.records);
+        const clinical = localStorage.getItem(KEYS.clinicalDataset);
+        if (p) {
+          const parsed = JSON.parse(p) as Patient[];
+          setPatients(
+            parsed.map((patient) => {
+              const seed = seedPatients.find((s) => s.id === patient.id);
+              return {
+                ...patient,
+                ibdCode: patient.ibdCode ?? seed?.ibdCode,
+                country: patient.country ?? seed?.country ?? "India",
+                defaultPhoneContact: patient.defaultPhoneContact ?? "primary",
+              };
+            }),
+          );
+        }
+        if (r) {
+          const parsed = JSON.parse(r) as ClinicalRecords;
+          setRecords({ ...seedRecords, ...parsed });
+        }
+        if (clinical) setClinicalDatasetRecords(JSON.parse(clinical));
+        setAssistant(readAssistantWorkspace());
       }
-      if (r) setRecords(JSON.parse(r));
+      const saved = localStorage.getItem(KEYS.reports);
       if (saved) setReports(JSON.parse(saved));
-      if (clinical) setClinicalDatasetRecords(JSON.parse(clinical));
       setAuthenticated(
         localStorage.getItem(KEYS.auth) === "true" ||
           sessionStorage.getItem(KEYS.auth) === "true",
       );
+      setPreferences(readPreferences());
     } finally {
       setReady(true);
     }
@@ -121,11 +198,144 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       );
     }
   }, [clinicalDatasetRecords, ready]);
+  useEffect(() => {
+    if (ready) {
+      localStorage.setItem(KEYS.preferences, JSON.stringify(preferences));
+    }
+  }, [preferences, ready]);
+  useEffect(() => {
+    if (ready) {
+      localStorage.setItem(KEYS.assistant, JSON.stringify(assistant));
+    }
+  }, [assistant, ready]);
 
   const value = useMemo<DemoStore>(
     () => ({
       ready,
       authenticated,
+      preferences,
+      setClinicalAssistantEnabled(enabled) {
+        setPreferences((current) => ({
+          ...current,
+          clinicalAssistantEnabled: enabled,
+        }));
+      },
+      assistant,
+      newAssistantChat() {
+        const now = new Date().toISOString();
+        const id = `chat-${Date.now()}`;
+        setAssistant((current) => ({
+          ...current,
+          activeChatId: id,
+          chats: [
+            {
+              id,
+              title: "New chat",
+              pinned: false,
+              updatedAt: now,
+              messages: [],
+            },
+            ...current.chats,
+          ],
+        }));
+      },
+      selectAssistantChat(chatId) {
+        setAssistant((current) => ({ ...current, activeChatId: chatId }));
+      },
+      deleteAssistantChat(chatId) {
+        setAssistant((current) => {
+          const chats = current.chats.filter((c) => c.id !== chatId);
+          let activeChatId = current.activeChatId;
+          if (activeChatId === chatId) {
+            activeChatId = chats[0]?.id ?? null;
+          }
+          return { ...current, chats, activeChatId };
+        });
+      },
+      togglePinAssistantChat(chatId) {
+        setAssistant((current) => ({
+          ...current,
+          chats: current.chats.map((c) =>
+            c.id === chatId ? { ...c, pinned: !c.pinned } : c,
+          ),
+        }));
+      },
+      sendAssistantMessage(content) {
+        const text = content.trim();
+        if (!text) return;
+        const now = new Date().toISOString();
+        setAssistant((current) => {
+          let { activeChatId, chats, reports } = current;
+          if (!activeChatId) {
+            const id = `chat-${Date.now()}`;
+            activeChatId = id;
+            chats = [
+              {
+                id,
+                title: "New chat",
+                pinned: false,
+                updatedAt: now,
+                messages: [],
+              },
+              ...chats,
+            ];
+          }
+          const userMsg = {
+            id: `msg-${Date.now()}`,
+            role: "user" as const,
+            content: text,
+            createdAt: now,
+          };
+          const assistantMsg = {
+            id: `msg-${Date.now() + 1}`,
+            role: "assistant" as const,
+            content: ASSISTANT_PREVIEW_REPLY,
+            createdAt: now,
+          };
+          chats = chats.map((chat) => {
+            if (chat.id !== activeChatId) return chat;
+            const messages = [...chat.messages, userMsg, assistantMsg];
+            const title =
+              chat.messages.length === 0
+                ? chatTitleFromMessage(text)
+                : chat.title;
+            return {
+              ...chat,
+              title,
+              messages,
+              updatedAt: now,
+            };
+          });
+          const wantsReport = /\b(pdf|excel|export|report)\b/i.test(text);
+          if (wantsReport) {
+            reports = [
+              {
+                id: `rpt-${Date.now()}`,
+                title: chatTitleFromMessage(text),
+                format: /\bpdf\b/i.test(text) ? "PDF" : "Excel",
+                pinned: false,
+                createdAt: now,
+              },
+              ...reports,
+            ];
+          }
+          return { activeChatId, chats, reports };
+        });
+      },
+      deleteAssistantReport(reportId) {
+        setAssistant((current) => ({
+          ...current,
+          reports: current.reports.filter((r) => r.id !== reportId),
+        }));
+      },
+      togglePinAssistantReport(reportId) {
+        setAssistant((current) => ({
+          ...current,
+          reports: current.reports.map((r) =>
+            r.id === reportId ? { ...r, pinned: !r.pinned } : r,
+          ),
+        }));
+      },
       patients,
       records,
       reports,
@@ -266,9 +476,21 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem(KEYS.records);
         localStorage.removeItem(KEYS.reports);
         localStorage.removeItem(KEYS.clinicalDataset);
+        localStorage.removeItem(KEYS.assistant);
+        localStorage.setItem(KEYS.dataVersion, DEMO_DATA_VERSION);
+        setAssistant(seedAssistantWorkspace());
       },
     }),
-    [ready, authenticated, patients, records, reports, clinicalDatasetRecords],
+    [
+      ready,
+      authenticated,
+      preferences,
+      assistant,
+      patients,
+      records,
+      reports,
+      clinicalDatasetRecords,
+    ],
   );
 
   return <Context.Provider value={value}>{children}</Context.Provider>;

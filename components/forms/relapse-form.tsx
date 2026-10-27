@@ -93,7 +93,11 @@ export function RelapseForm({
     setForm((current) => {
       const next = { ...current, [key]: value };
       if (key === "relapseCause" && value !== "Other") next.causeOther = "";
-      if (key === "infection" && value !== "Yes") next.infectionType = "";
+      if (key === "infection" && value !== "Yes") {
+        next.infectionType = "";
+        next.infectionTypeDetail = "";
+      }
+      if (key === "infectionType") next.infectionTypeDetail = "";
       if (key === "rescueTherapy" && value !== "Yes") {
         next.rescueTherapyType = "";
         next.rescueTherapyFailure = "";
@@ -223,6 +227,25 @@ export function RelapseForm({
                   <option key={type}>{type}</option>
                 ))}
               </Select>
+            </Field>
+          )}
+          {form.infection === "Yes" && form.infectionType && (
+            <Field
+              label={
+                form.infectionType === "Other"
+                  ? "Specify infection type"
+                  : "Infection details"
+              }
+            >
+              <Input
+                value={form.infectionTypeDetail}
+                onChange={(e) => update("infectionTypeDetail", e.target.value)}
+                placeholder={
+                  form.infectionType === "Other"
+                    ? "Enter the infection type"
+                    : "Optional details"
+                }
+              />
             </Field>
           )}
         </Section>

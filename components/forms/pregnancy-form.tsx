@@ -12,14 +12,20 @@ import {
 import {
   buildPregnancyFormState,
   pregnancyFormToRecords,
+  pregnancyRowsForCount,
   pregnancySectionLabel,
   resizePregnancyRows,
   suggestNextPregnancyNumber,
   type PregnancyFormState,
   type PregnancyRowState,
 } from "@/lib/pregnancy-utils";
+import {
+  buildOffspringFormState,
+  offspringFormToRecord,
+  type OffspringFormState,
+} from "@/lib/offspring-utils";
 import { Button, Field, Input, Select, Textarea } from "@/components/ui/core";
-import type { PregnancyRecord } from "@/types/clinical";
+import type { OffspringRecord, PregnancyRecord } from "@/types/clinical";
 
 const YES_NO_OPTIONS = YES_NO.filter((value) => value !== "Not known");
 
@@ -301,6 +307,7 @@ function PregnancyPanel({
 export function PregnancyForm({
   patientId,
   existingRecords,
+  motherRecord,
   onCancel,
   onSave,
   onSaveAndContinue,
@@ -308,20 +315,45 @@ export function PregnancyForm({
 }: {
   patientId: string;
   existingRecords: PregnancyRecord[];
+  /** When set, the female offspring summary is saved with the pregnancies. */
+  motherRecord?: OffspringRecord | null;
   onCancel: () => void;
-  onSave: (records: PregnancyRecord[]) => void;
-  onSaveAndContinue?: (records: PregnancyRecord[]) => void;
+  onSave: (
+    records: PregnancyRecord[],
+    mother?: OffspringRecord,
+  ) => void;
+  onSaveAndContinue?: (
+    records: PregnancyRecord[],
+    mother?: OffspringRecord,
+  ) => void;
   continueHint?: string | null;
 }) {
+  const includeMotherSummary = motherRecord !== undefined;
   const startNumber = useMemo(
     () => suggestNextPregnancyNumber(existingRecords),
     [existingRecords],
   );
-  const [form, setForm] = useState<PregnancyFormState>(() =>
-    buildPregnancyFormState(existingRecords, 1),
-  );
+  const [form, setForm] = useState<PregnancyFormState>(() => ({
+    rows: includeMotherSummary
+      ? pregnancyRowsForCount(
+          existingRecords,
+          motherRecord?.numberOfPregnancies,
+        )
+      : buildPregnancyFormState(existingRecords, 1).rows,
+  }));
   const [openRows, setOpenRows] = useState<Set<string>>(
     () => new Set(form.rows[0] ? [form.rows[0].id] : []),
+  );
+  const [mother, setMother] = useState<OffspringFormState>(() => {
+    const state = buildOffspringFormState(motherRecord);
+    if (!includeMotherSummary) return state;
+    return {
+      ...state,
+      numberOfPregnancies: String(form.rows.length),
+    };
+  });
+  const [motherId] = useState(
+    () => motherRecord?.id ?? `OFF-${patientId}-${Date.now()}`,
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const batchId = useMemo(
@@ -330,8 +362,13 @@ export function PregnancyForm({
   );
 
   const setPregnancyCount = (count: number) => {
+    const numberingStart = includeMotherSummary ? 1 : startNumber;
+    if (count <= 0) {
+      setForm({ rows: [] });
+      return;
+    }
     setForm((current) => {
-      const rows = resizePregnancyRows(current.rows, count, startNumber);
+      const rows = resizePregnancyRows(current.rows, count, numberingStart);
       setOpenRows((open) => {
         const next = new Set(open);
         rows.forEach((row) => {
@@ -365,7 +402,9 @@ export function PregnancyForm({
 
   const validate = () => {
     const next: Record<string, string> = {};
-    if (!form.rows.length) next.rows = "Add at least one pregnancy.";
+    if (!form.rows.length && !includeMotherSummary) {
+      next.rows = "Add at least one pregnancy.";
+    }
     form.rows.forEach((row) => {
       if (!row.pregnancyYear) next[row.id] = "Pregnancy year is required.";
     });
@@ -373,34 +412,112 @@ export function PregnancyForm({
     return Object.keys(next).length === 0;
   };
 
+  const setMotherField = <K extends keyof OffspringFormState>(
+    key: K,
+    value: OffspringFormState[K],
+  ) => {
+    setMother((current) => ({ ...current, [key]: value }));
+  };
+
   const submit = (andContinue = false) => {
     if (!validate()) return;
     const records = pregnancyFormToRecords(form, patientId, batchId);
-    if (andContinue && onSaveAndContinue) onSaveAndContinue(records);
-    else onSave(records);
+    const motherSummary = includeMotherSummary
+      ? offspringFormToRecord(
+          {
+            ...mother,
+            numberOfPregnancies: String(form.rows.length),
+            remarks: "",
+          },
+          patientId,
+          motherId,
+          "Female",
+        )
+      : undefined;
+    if (andContinue && onSaveAndContinue) onSaveAndContinue(records, motherSummary);
+    else onSave(records, motherSummary);
   };
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-          <Field label="Number of pregnancies to record">
-            <Input
-              type="number"
-              min={1}
-              max={10}
-              step={1}
-              value={form.rows.length}
-              onChange={(e) =>
-                setPregnancyCount(Number(e.target.value) || 1)
-              }
-            />
-          </Field>
-          <p className="mt-2 text-xs text-slate-500">
-            Each pregnancy opens in its own accordion: First pregnancy, Second
-            pregnancy, and so on. Expand or collapse sections as needed.
+        {includeMotherSummary && (
+          <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="text-sm font-bold text-teal-800">
+              Mother summary
+            </h3>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <Field label="Total offspring/s">
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={mother.totalOffspring}
+                  onChange={(e) =>
+                    setMotherField("totalOffspring", e.target.value)
+                  }
+                />
+              </Field>
+              <Field label="No. of children after disease onset">
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={mother.offspringSinceIbdOnset}
+                  onChange={(e) =>
+                    setMotherField("offspringSinceIbdOnset", e.target.value)
+                  }
+                />
+              </Field>
+              <Field label="No. of pregnancy">
+                <Input
+                  type="number"
+                  min={0}
+                  max={10}
+                  step={1}
+                  value={mother.numberOfPregnancies}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === "") {
+                      setMotherField("numberOfPregnancies", "");
+                      setPregnancyCount(0);
+                      return;
+                    }
+                    const count = Number(value);
+                    if (Number.isNaN(count)) return;
+                    const clamped = Math.max(0, Math.min(10, count));
+                    setMotherField("numberOfPregnancies", String(clamped));
+                    setPregnancyCount(clamped);
+                  }}
+                />
+              </Field>
+            </div>
+          </section>
+        )}
+        {!includeMotherSummary && (
+          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+            <Field label="Number of pregnancies to record">
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                step={1}
+                value={form.rows.length}
+                onChange={(e) => setPregnancyCount(Number(e.target.value) || 1)}
+              />
+            </Field>
+            <p className="mt-2 text-xs text-slate-500">
+              Each pregnancy opens in its own accordion: First pregnancy, Second
+              pregnancy, and so on. Expand or collapse sections as needed.
+            </p>
+          </div>
+        )}
+        {includeMotherSummary && (
+          <p className="mb-4 text-xs text-slate-500">
+            Pregnancy sections follow No. of pregnancy. Expand or collapse each
+            one as needed.
           </p>
-        </div>
+        )}
 
         {errors.rows && (
           <p className="mb-3 text-xs text-red-600">{errors.rows}</p>
@@ -470,7 +587,9 @@ export function PregnancyForm({
         onSaveAndContinue={
           onSaveAndContinue ? () => submit(true) : undefined
         }
-        saveLabel="Save pregnancies"
+        saveLabel={
+          includeMotherSummary ? "Save pregnancy & offspring" : "Save pregnancies"
+        }
         continueHint={continueHint}
       />
     </div>

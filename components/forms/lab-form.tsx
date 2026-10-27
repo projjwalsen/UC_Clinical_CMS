@@ -3,17 +3,12 @@
 import { useMemo, useState } from "react";
 import { Check, Plus, Trash2 } from "lucide-react";
 import { FormSaveActions } from "@/components/forms/form-save-actions";
-import {
-  ABNORMAL_FLAGS,
-  LAB_CATEGORIES,
-  testsForCategory,
-} from "@/data/lab-lookups";
+import { LAB_CATEGORIES, testsForCategory } from "@/data/lab-lookups";
 import { CMV_METHODS } from "@/data/lookups";
 import { getLabTestReference } from "@/data/lab-reference-ranges";
 import {
   applyTestDefaults,
   buildLabFormState,
-  computeAbnormalFlag,
   emptyLabRow,
   labFormToRecords,
   type LabFormState,
@@ -30,6 +25,7 @@ function applyRowPatch(row: LabRowState, patch: Partial<LabRowState>): LabRowSta
       ...next,
       category: patch.category,
       testName: "",
+      otherTestName: "",
       resultNumeric: "",
       resultText: "",
       unit: "",
@@ -44,18 +40,11 @@ function applyRowPatch(row: LabRowState, patch: Partial<LabRowState>): LabRowSta
     return {
       ...next,
       ...applyTestDefaults(patch.testName, row.category),
+      otherTestName: patch.testName === "Other" ? row.otherTestName : "",
       resultNumeric: "",
       cmvMethod: "",
       remarks: row.remarks,
     };
-  }
-
-  if (patch.resultNumeric !== undefined && patch.resultNumeric !== "") {
-    const numeric = Number(patch.resultNumeric);
-    if (!Number.isNaN(numeric)) {
-      const flag = computeAbnormalFlag(next.testName, numeric);
-      if (flag) next.abnormalFlag = flag;
-    }
   }
 
   return next;
@@ -117,6 +106,12 @@ export function LabForm({
     form.rows.forEach((row) => {
       if (!row.category) next[row.id] = "Select a category.";
       else if (!row.testName) next[row.id] = "Select a test name.";
+      else if (
+        row.category === "Other" &&
+        row.testName === "Other" &&
+        !row.otherTestName.trim()
+      )
+        next[row.id] = "Enter the other test name.";
       else if (!row.resultNumeric && !row.resultText)
         next[row.id] = "Enter a numeric or text result.";
     });
@@ -167,8 +162,8 @@ export function LabForm({
           <div>
             <h3 className="text-sm font-bold text-slate-800">Laboratory tests</h3>
             <p className="mt-0.5 text-xs text-slate-500">
-              New tests are added at the top. Reference range and unit pre-fill
-              from the lab reference sheet.
+              New tests are added at the top. Unit pre-fills from the selected
+              test.
             </p>
           </div>
           <Button size="sm" variant="secondary" onClick={addRow}>
@@ -192,7 +187,7 @@ export function LabForm({
               >
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-sm font-bold text-slate-800">
-                    Test: {row.testName || "N/A"}
+                    Test: {row.otherTestName.trim() || row.testName || "N/A"}
                     {index === 0 && form.rows.length > 1 && (
                       <span className="ml-2 text-xs font-normal text-teal-700">
                         Latest
@@ -265,32 +260,25 @@ export function LabForm({
                       }
                     />
                   </Field>
+                  {row.category === "Other" && row.testName === "Other" && (
+                    <Field label="Other test name" required>
+                      <Input
+                        value={row.otherTestName}
+                        onChange={(e) =>
+                          updateRow(row.id, { otherTestName: e.target.value })
+                        }
+                        placeholder="Enter the test name"
+                      />
+                    </Field>
+                  )}
                   <Field label="Unit">
                     <Input
                       value={row.unit}
                       onChange={(e) =>
                         updateRow(row.id, { unit: e.target.value })
                       }
-                      placeholder="Auto-filled from reference"
+                      placeholder="Unit"
                     />
-                  </Field>
-                  <Field label="Reference range">
-                    <p className="text-sm font-bold text-slate-800">
-                      {row.referenceRange || "—"}
-                    </p>
-                  </Field>
-                  <Field label="Abnormal flag">
-                    <Select
-                      className="w-full"
-                      value={row.abnormalFlag}
-                      onChange={(e) =>
-                        updateRow(row.id, { abnormalFlag: e.target.value })
-                      }
-                    >
-                      {ABNORMAL_FLAGS.map((flag) => (
-                        <option key={flag}>{flag}</option>
-                      ))}
-                    </Select>
                   </Field>
                   <Field label="CMV method">
                     <Select

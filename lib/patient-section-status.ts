@@ -1,4 +1,5 @@
 import { POUCHOSCOPY_SECTION_ENABLED } from "@/lib/clinical-workflow";
+import { offspringTabLabel } from "@/lib/offspring-utils";
 import type { ClinicalRecords, Patient } from "@/types/clinical";
 import type { ClinicalDatasetRecord } from "@/types/clinical-report";
 
@@ -23,7 +24,23 @@ export function buildPatientSectionStatus(
     section("visits", "Visit & Epidemiological", related.visits.length),
     section("symptoms", "Clinical Features", related.symptoms.length),
     section("eims", "Extra-intestinal manifestations", related.eims.length),
-    section("offspring", "Offspring", related.offspring.length),
+    section("courseOfDisease", "Course of Disease", related.courseOfDisease.length),
+    section(
+      "diseaseCategorization",
+      "Disease Categorization",
+      related.diseaseCategorization.length,
+    ),
+    isFemale
+      ? section(
+          "pregnancies",
+          "Pregnancy & offspring",
+          related.pregnancies.length + related.offspring.length,
+        )
+      : section(
+          "offspring",
+          offspringTabLabel(patient.gender),
+          related.offspring.length,
+        ),
     section("labs", "Lab Investigations", related.labs.length),
     section(
       "endoscopies",
@@ -46,10 +63,6 @@ export function buildPatientSectionStatus(
       count: hasClinicalDataset ? 1 : 0,
     },
   ];
-
-  if (isFemale) {
-    items.push(section("pregnancies", "Pregnancy", related.pregnancies.length));
-  }
 
   return items;
 }

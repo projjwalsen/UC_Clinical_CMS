@@ -11,6 +11,7 @@ export type RelapseFormState = {
   ivSteroid: string;
   infection: string;
   infectionType: string;
+  infectionTypeDetail: string;
   rescueTherapy: string;
   rescueTherapyType: string;
   rescueTherapyFailure: string;
@@ -37,6 +38,7 @@ export function relapseRecordToFormState(record: RelapseRecord): RelapseFormStat
     ivSteroid: record.ivSteroid ?? "",
     infection: record.infection ?? "",
     infectionType: record.infectionType ?? "",
+    infectionTypeDetail: record.infectionTypeDetail ?? "",
     rescueTherapy: record.rescueTherapy ?? "",
     rescueTherapyType: record.rescueTherapyType ?? "",
     rescueTherapyFailure: record.rescueTherapyFailure ?? "",
@@ -64,6 +66,7 @@ export function buildRelapseFormState(
     ivSteroid: "",
     infection: "",
     infectionType: "",
+    infectionTypeDetail: "",
     rescueTherapy: "",
     rescueTherapyType: "",
     rescueTherapyFailure: "",
@@ -95,6 +98,10 @@ export function relapseFormToRecord(
     ivSteroid: form.ivSteroid || undefined,
     infection: form.infection || undefined,
     infectionType: form.infectionType || undefined,
+    infectionTypeDetail:
+      form.infection === "Yes" && form.infectionType
+        ? form.infectionTypeDetail || undefined
+        : undefined,
     rescueTherapy: form.rescueTherapy || undefined,
     rescueTherapyType: form.rescueTherapyType || undefined,
     rescueTherapyFailure: form.rescueTherapyFailure || undefined,

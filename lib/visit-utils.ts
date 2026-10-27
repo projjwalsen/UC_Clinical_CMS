@@ -3,7 +3,7 @@ import {
   computeMayoScores,
   parseMayoComponent,
 } from "@/lib/mayo-score";
-import type { Visit } from "@/types/clinical";
+import type { Patient, Visit } from "@/types/clinical";
 
 export function calculateBmi(heightM: number, weightKg: number) {
   if (!heightM || !weightKg) return 0;
@@ -23,7 +23,10 @@ export function getLastVisit(visits: Visit[]) {
   return [...visits].sort((a, b) => b.date.localeCompare(a.date))[0];
 }
 
-export function visitToFormState(visit: Visit): VisitFormState {
+export function visitToFormState(
+  visit: Visit,
+  patient?: Patient | null,
+): VisitFormState {
   return {
     date: visit.date,
     type: visit.type,
@@ -71,6 +74,29 @@ export function visitToFormState(visit: Visit): VisitFormState {
     specialComment: visit.specialComment ?? "",
     montrealExtent: visit.montrealExtent ?? "E2",
     montrealSeverity: visit.montrealSeverity ?? "S0",
+    diagnosisDate: visit.diagnosisDate ?? patient?.diagnosisDate ?? "",
+    ageAtSymptomOnsetYears: str(
+      visit.ageAtSymptomOnsetYears ?? patient?.ageAtSymptomOnsetYears,
+    ),
+    illnessDurationMonths: str(
+      visit.illnessDurationMonths ?? patient?.illnessDurationMonths,
+    ),
+    symptomOnsetToDiagnosisIntervalMonths: str(
+      visit.symptomOnsetToDiagnosisIntervalMonths ??
+        patient?.symptomOnsetToDiagnosisIntervalMonths,
+    ),
+    diseaseExtent: visit.diseaseExtent ?? patient?.diseaseExtent ?? "Left-sided colitis",
+    severity: visit.severity ?? patient?.severity ?? "Moderate",
+    familyHistory:
+      visit.familyHistory !== undefined
+        ? visit.familyHistory
+          ? "Yes"
+          : "No"
+        : patient?.familyHistory
+          ? "Yes"
+          : "No",
+    diseaseStatus: visit.diseaseStatus ?? patient?.status ?? "Active disease",
+    clinicalNotes: visit.clinicalNotes ?? patient?.notes ?? "",
   };
 }
 
@@ -122,13 +148,40 @@ export type VisitFormState = {
   specialComment: string;
   montrealExtent: string;
   montrealSeverity: string;
+  diagnosisDate: string;
+  ageAtSymptomOnsetYears: string;
+  illnessDurationMonths: string;
+  symptomOnsetToDiagnosisIntervalMonths: string;
+  diseaseExtent: string;
+  severity: string;
+  familyHistory: string;
+  diseaseStatus: string;
+  clinicalNotes: string;
 };
+
+function diseaseDefaults(patient?: Patient | null) {
+  return {
+    diagnosisDate: patient?.diagnosisDate ?? "",
+    ageAtSymptomOnsetYears: str(patient?.ageAtSymptomOnsetYears),
+    illnessDurationMonths: str(patient?.illnessDurationMonths),
+    symptomOnsetToDiagnosisIntervalMonths: str(
+      patient?.symptomOnsetToDiagnosisIntervalMonths,
+    ),
+    diseaseExtent: patient?.diseaseExtent ?? "Left-sided colitis",
+    severity: patient?.severity ?? "Moderate",
+    familyHistory: patient?.familyHistory ? "Yes" : "No",
+    diseaseStatus: patient?.status ?? "Active disease",
+    clinicalNotes: patient?.notes ?? "",
+  };
+}
 
 export function buildVisitFormState(
   visitCount: number,
   lastVisit: Visit | null,
+  patient?: Patient | null,
   today = "2026-09-07",
 ): VisitFormState {
+  const disease = diseaseDefaults(patient);
   const base: VisitFormState = {
     date: today,
     type: suggestVisitType(visitCount),
@@ -174,6 +227,7 @@ export function buildVisitFormState(
     specialComment: "",
     montrealExtent: "E2",
     montrealSeverity: "S0",
+    ...disease,
   };
 
   if (!lastVisit) return base;
@@ -208,6 +262,72 @@ export function buildVisitFormState(
     clinicalState: lastVisit.clinicalState ?? base.clinicalState,
     montrealExtent: lastVisit.montrealExtent ?? base.montrealExtent,
     montrealSeverity: lastVisit.montrealSeverity ?? base.montrealSeverity,
+    diagnosisDate: lastVisit.diagnosisDate ?? disease.diagnosisDate,
+    ageAtSymptomOnsetYears: str(
+      lastVisit.ageAtSymptomOnsetYears ?? patient?.ageAtSymptomOnsetYears,
+    ),
+    illnessDurationMonths: str(
+      lastVisit.illnessDurationMonths ?? patient?.illnessDurationMonths,
+    ),
+    symptomOnsetToDiagnosisIntervalMonths: str(
+      lastVisit.symptomOnsetToDiagnosisIntervalMonths ??
+        patient?.symptomOnsetToDiagnosisIntervalMonths,
+    ),
+    diseaseExtent: lastVisit.diseaseExtent ?? disease.diseaseExtent,
+    severity: lastVisit.severity ?? disease.severity,
+    familyHistory:
+      lastVisit.familyHistory !== undefined
+        ? lastVisit.familyHistory
+          ? "Yes"
+          : "No"
+        : disease.familyHistory,
+    diseaseStatus: lastVisit.diseaseStatus ?? disease.diseaseStatus,
+    clinicalNotes: lastVisit.clinicalNotes ?? disease.clinicalNotes,
+  };
+}
+
+export function ageAtDiagnosisYears(diagnosisDate: string, dateOfBirth: string) {
+  if (!diagnosisDate || !dateOfBirth) return 0;
+  return Math.max(
+    0,
+    new Date(diagnosisDate).getFullYear() - new Date(dateOfBirth).getFullYear(),
+  );
+}
+
+export function diseaseDurationYears(diagnosisDate: string, today = new Date()) {
+  if (!diagnosisDate) return 0;
+  return Math.max(0, today.getFullYear() - new Date(diagnosisDate).getFullYear());
+}
+
+export function applyVisitDiseaseToPatient(patient: Patient, visit: Visit): Patient {
+  if (!visit.diagnosisDate) return patient;
+  const smokingOptions = ["Never", "Ex-smoker", "Current"] as const;
+  const smokingStatus = smokingOptions.includes(
+    visit.smokingStatus as (typeof smokingOptions)[number],
+  )
+    ? (visit.smokingStatus as Patient["smokingStatus"])
+    : patient.smokingStatus;
+  return {
+    ...patient,
+    diagnosisDate: visit.diagnosisDate,
+    ageAtDiagnosis: ageAtDiagnosisYears(visit.diagnosisDate, patient.dateOfBirth),
+    diseaseDurationYears: diseaseDurationYears(visit.diagnosisDate),
+    ageAtSymptomOnsetYears: visit.ageAtSymptomOnsetYears,
+    illnessDurationMonths: visit.illnessDurationMonths,
+    symptomOnsetToDiagnosisIntervalMonths:
+      visit.symptomOnsetToDiagnosisIntervalMonths,
+    diseaseExtent: visit.diseaseExtent ?? patient.diseaseExtent,
+    severity: visit.severity ?? patient.severity,
+    familyHistory: visit.familyHistory ?? patient.familyHistory,
+    status: visit.diseaseStatus ?? patient.status,
+    notes: visit.clinicalNotes ?? patient.notes,
+    smokingStatus,
+    comorbidities: visit.comorbidIllnesses
+      ? visit.comorbidIllnesses
+          .split(/[;,]/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : patient.comorbidities,
   };
 }
 
@@ -280,5 +400,16 @@ export function visitFormToRecord(
     specialComment: form.specialComment || undefined,
     montrealExtent: form.montrealExtent,
     montrealSeverity: form.montrealSeverity,
+    diagnosisDate: form.diagnosisDate || undefined,
+    ageAtSymptomOnsetYears: num(form.ageAtSymptomOnsetYears),
+    illnessDurationMonths: num(form.illnessDurationMonths),
+    symptomOnsetToDiagnosisIntervalMonths: num(
+      form.symptomOnsetToDiagnosisIntervalMonths,
+    ),
+    diseaseExtent: (form.diseaseExtent || undefined) as Visit["diseaseExtent"],
+    severity: (form.severity || undefined) as Visit["severity"],
+    familyHistory: form.familyHistory === "Yes",
+    diseaseStatus: (form.diseaseStatus || undefined) as Visit["diseaseStatus"],
+    clinicalNotes: form.clinicalNotes || undefined,
   };
 }

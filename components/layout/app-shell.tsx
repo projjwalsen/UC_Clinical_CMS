@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -9,6 +9,7 @@ import {
   Bell,
   ChevronDown,
   FileBarChart,
+  FileSpreadsheet,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -17,6 +18,7 @@ import {
   PlusCircle,
   Search,
   Settings,
+  Sparkles,
   Users,
   X,
 } from "lucide-react";
@@ -28,10 +30,12 @@ import { PatientDirectory } from "@/components/patients/patient-directory";
 import { PatientForm } from "@/components/forms/patient-form";
 import { PatientProfile } from "@/components/patients/patient-profile";
 import { ClinicalRecordsPage } from "@/components/clinical/clinical-records";
+import { PatientCohortReport } from "@/components/reports/patient-cohort-report";
 import {
   ReportBuilder,
   StatisticalReports,
 } from "@/components/reports/reports";
+import { ClinicalAssistantPage } from "@/components/assistant/clinical-assistant-page";
 import { SettingsPage } from "@/components/settings/settings";
 import type { ClinicalRecords } from "@/types/clinical";
 
@@ -40,21 +44,26 @@ const nav = [
   ["patients", "Patients", Users],
   ["add-patient", "Add Patient", PlusCircle],
   ["clinical-records", "Clinical Records", Activity],
+  ["patient-report", "Patient report", FileSpreadsheet],
   ["reports", "Statistical Reports", BarChart3],
   ["advanced-reports", "Advanced Reports", FileBarChart],
   ["clinical-dataset", "Clinical Dataset Report", FileBarChart],
+  ["clinical-assistant", "Clinical Assistant", Sparkles],
   ["settings", "Settings", Settings],
 ] as const;
+
 const titles: Record<string, string> = {
   dashboard: "Dashboard",
   patients: "Patients",
   "add-patient": "Add Patient",
   "clinical-records": "Clinical Records",
+  "patient-report": "Patient report",
   reports: "Statistical Reports",
   "advanced-reports": "Advanced Reports",
   settings: "Settings",
   profile: "Patient Profile",
   "clinical-dataset": "Clinical Dataset Report",
+  "clinical-assistant": "Clinical Assistant",
 };
 
 export function AppShell({
@@ -65,7 +74,7 @@ export function AppShell({
   initialPatientId?: string;
 } = {}) {
   const router = useRouter();
-  const { patients, logout } = useDemoStore();
+  const { patients, logout, preferences } = useDemoStore();
   const [page, setPage] = useState(initialPage ?? "dashboard");
   const [patientId, setPatientId] = useState(initialPatientId ?? "");
   const [mobile, setMobile] = useState(false);
@@ -80,6 +89,25 @@ export function AppShell({
     if (initialPage) setPage(initialPage);
     if (initialPatientId) setPatientId(initialPatientId);
   }, [initialPage, initialPatientId]);
+
+  const visibleNav = useMemo(
+    () =>
+      nav.filter(
+        ([key]) =>
+          key !== "clinical-assistant" ||
+          preferences.clinicalAssistantEnabled,
+      ),
+    [preferences.clinicalAssistantEnabled],
+  );
+
+  useEffect(() => {
+    if (
+      !preferences.clinicalAssistantEnabled &&
+      page === "clinical-assistant"
+    ) {
+      setPage("dashboard");
+    }
+  }, [preferences.clinicalAssistantEnabled, page]);
 
   const navigate = (next: string) => {
     if (next === "clinical-dataset") {
@@ -151,7 +179,7 @@ export function AppShell({
           >
             Workspace
           </p>
-          {nav.map(([key, label, Icon]) => (
+          {visibleNav.map(([key, label, Icon]) => (
             <button
               key={key}
               title={collapsed ? label : undefined}
@@ -305,7 +333,13 @@ export function AppShell({
             )}
           </div>
         </header>
-        <main className="mx-auto max-w-[1600px] p-4 md:p-6">
+        <main
+          className={
+            page === "clinical-assistant"
+              ? "p-4 md:p-6"
+              : "mx-auto max-w-[1600px] p-4 md:p-6"
+          }
+        >
           {page === "dashboard" && (
             <Dashboard onNavigate={navigate} onPatient={patient} />
           )}
@@ -338,6 +372,7 @@ export function AppShell({
           {page === "clinical-records" && (
             <ClinicalRecordsPage onPatient={patient} />
           )}
+          {page === "patient-report" && <PatientCohortReport />}
           {page === "reports" && <StatisticalReports />}
           {page === "advanced-reports" && <ReportBuilder />}
           {page === "clinical-dataset" && (
@@ -352,6 +387,8 @@ export function AppShell({
               workspace for filters, export, and print.
             </div>
           )}
+          {page === "clinical-assistant" &&
+            preferences.clinicalAssistantEnabled && <ClinicalAssistantPage />}
           {page === "settings" && <SettingsPage />}
         </main>
       </div>
